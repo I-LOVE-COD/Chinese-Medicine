@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>D3.js 多层圆圈弧线 - 响应式</title>
+  <script src="plugins/d3.v7.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="plugins/fontawesome-free-6.7.2-web/css/all.css">
+  <style>
+    /* 原有样式保持不变 */
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100%;
+      background-image: url("background2.jpg");
+      background-size: cover;
+      background-repeat: no-repeat;
+    }
+
+    .arc-layer {
+      stroke: #c19d3f;
+      stroke-width: 1px;
+      opacity: 0.8;
+    }
+
+    .circle-road {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    .division-circle {
+      stroke: white;
+      stroke-width: 1px;
+    }
+
+    .technique-label {
+      font-size: 14px;
+      fill: #45496a;
+      text-anchor: start;
+      font-family: "STKaiti";
+    }
+
+    .technique-name-label {
+      font-size: 14px;
+      fill: #c19d3f;
+      text-anchor: middle;
+      font-family: "宋体", "SimSun";
+    }
+
+    .line {
+      stroke: #bbd3e8;
+      stroke-width: 1px;
+    }
+
+    .node-circle {
+      fill: #dddadd;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .node-circle:hover {
+      fill: orange;
+      r: 6;
+    }
+
+    .center-circle {
+      fill: red;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+
+
+    .axis {
+      fill: #b7bda0;
+      stroke: #c19d3f;
+      stroke-width: 10;
+      opacity: 0.6;
+    }
+
+    .dynasty-label {
+      font-size: 14px;
+      fill: #8B4513;
+      text-anchor: middle;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .dynasty-label:hover {
+      fill: #ffd700;
+      font-size: 16px;
+    }
+
+    .time-marker {
+      stroke: #9e8576;
+      stroke-width: 6;
+    }
+
+    .background-line {
+      fill: #b7bda0;
+      stroke: #b77d6e;
+      stroke-width: 10;
+      opacity: 0.6;
+    }
+
+    .long-line {
+      stroke: #bd9e84;
+      stroke-width: 1;
+    }
+
+    .event-node {
+      cursor: pointer;
+    }
+
+    /* 新增工具提示样式 */
+    .tooltip {
+      position: absolute;
+      padding: 15px;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 8px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s;
+      min-width: 220px;
+      font-family: "Microsoft YaHei", sans-serif;
+    }
+
+    .tooltip-title {
+      font-size: 16px;
+      color: #c19d3f;
+      margin-bottom: 8px;
+      font-weight: bold;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 6px;
+    }
+
+    .tooltip-author {
+      color: #666;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .tooltip-year {
+      color: #999;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .tooltip-desc {
+      color: #444;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .circle-road {
+      position: absolute;
+      z-index: 1;
+      /* 主图在下层 */
+      pointer-events: none;
+      /* 允许事件穿透 */
+    }
+
+    /* 主图中需要交互的元素重置指针事件 */
+    .circle-road .node-circle,
+    .circle-road .technique-name-label {
+      pointer-events: auto;
+    }
+
+    .packing-container {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      width: 30%;
+      height: 30%;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 10px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .link--active {
+      stroke: #000 !important;
+      stroke-width: 1.5px;
+    }
+
+    .link-extension--active {
+      stroke-opacity: .6;
+    }
+
+    .label--active {
+      font-weight: bold;
+    }
+
+    .cir-tooltip {
+      position: fixed;
+      bottom: 4%;
+      right: 4%;
+      transform: translateX(-60%);
+      color: #444;
+      font-family: "STKaiti";
+      font-size: 26px;
+      opacity: 1.8;
+      text-align: middle;
+      z-index: 1000;
+      /* 确保显示在最上层 */
+    }
+
+    .node-star {
+      filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.3));
+    }
+
+    /* 新增图标相关样式 */
+    .book-icon {
+      transition: transform 0.3s;
+    }
+
+    .fa-icon {
+      pointer-events: none;
+      /* 避免图标文字干扰事件 */
+      font-family: 'Font Awesome 5 Free';
+      /* 明确字体类型 */
+      font-weight: 900;
+      /* 实心图标需要粗体 */
+    }
+  </style>
+          <style>
+        #pageSelector{
+            font-size:25px;
+            border-radius: 5px;
+             border: 1px solid #ccc;
+            padding: 8px 15px;
+            font-family: "STXingkai",
+        /* Windows 标准名称 */
+        "华文行楷",
+        /* 中文名称 */
+        "Xingkai SC",
+        /* macOS/iOS 名称 */
+        "STXinwei",
+        /* 备用名称 */
+        "KaiTi",
+        /* 回退到楷体 */
+        cursive;;
+            cursor: pointer;
+            background-color: white;
+        }
+    </style>
+</head>
+
+<body>
+
+
+  <div id="tooltip" class="tooltip"></div>
+    <div style="position: absolute; top: 20px; right: 20px; z-index: 1000; padding: 10px;">
+        <label for="pageSelector"></label><select id="pageSelector">
+      <option value="第二页.html">导引千式</option>
+        <option value="第三页.html">节气养和</option>
+        <option value="第四页.html">杏林春秋</option>
+                        <option value="第一页.html">流派渊承</option>
+                <option value="首页.html">首页</option>
+    </select>
+</div>
+<script>
+    // 获取下拉框元素
+    const pageSelector = document.getElementById('pageSelector');
+
+    // 添加change事件监听器
+    pageSelector.addEventListener('change', function() {
+        // 获取选中的值
+        const selectedPage = this.value;
+
+        // 如果选择了有效选项，则跳转页面
+        if (selectedPage) {
+            window.location.href = selectedPage;
+        }
+    });
+</script>
+
+  <script>
+
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    const svg = d3.select("body")
+      .append("svg")
+      .attr("width", window.innerWidth)
+      .attr("height", window.innerHeight);
+
+
+
+    // 绘制横线
+    svg.append("line")
+      .attr("class", "long-line")
+      .attr("x1", 0)
+      .attr("y1", height * 0.1)
+      .attr("x2", width)
+      .attr("y2", height * 0.1);
+
+    // 添加文本标签
+    svg.append("text")
+      .attr("class", "title")
+      .attr("x", width * 0.03)
+      .attr("y", height * 0.08) // 在横线之上
+      .attr("text-anchor", "start") // 文本居左对齐
+      .style("font-size", "45px") // 设置字体大小
+      .style("font-family", "STXingkai")
+      .style("fill", "black")
+      .text("溯古医源・导引千式");
+
+
+
+    // 添加文本标签
+    svg.append("text")
+      .attr("x", width * 0.38)
+      .attr("y", height * 0.15) // 在横线之上
+      .attr("writing-mode", "vertical-lr")
+      .attr("dominant-baseline", "hanging")
+      .attr("text-anchor", "middle")
+      .attr("text-anchor", "start") // 文本居左对齐
+      .style("font-size", "25px") // 设置字体大小
+      .style("font-family", "STXingkai")
+      .style("fill", " #c19d3f")
+      .text("气舞形生");
+
+    // 添加文本标签
+    svg.append("text")
+      .attr("x", width * 0.03)
+      .attr("y", height * 0.15)
+      .attr("writing-mode", "vertical-lr")
+      .attr("dominant-baseline", "hanging")
+      .attr("text-anchor", "middle")
+      .attr("text-anchor", "start") // 文本居左对齐
+      .style("font-size", "25px") // 设置字体大小
+      .style("font-family", "STXingkai")
+      .style("fill", " #c19d3f")
+      .text("气溯千年");
+
+    svg.append("text")
+      .attr("x", width * 0.8)
+      .attr("y", height * 0.5)
+      .attr("writing-mode", "vertical-lr")
+      .attr("dominant-baseline", "hanging")
+      .attr("text-anchor", "middle")
+      .attr("text-anchor", "start") // 文本居左对齐
+      .style("font-size", "25px") // 设置字体大小
+      .style("font-family", "STXingkai")
+      .style("fill", " #c19d3f")
+      .text("功式五维");
+
+    svg.append("text")
+      .attr("x", width * 0.3)
+      .attr("y", height * 0.6)
+      .attr("writing-mode", "vertical-lr")
+      .attr("dominant-baseline", "hanging")
+      .attr("text-anchor", "middle")
+      .attr("text-anchor", "start") // 文本居左对齐
+      .style("font-size", "25px") // 设置字体大小
+      .style("font-family", "STXingkai")
+      .style("fill", " #c19d3f")
+      .text("经枢焕形");
+
+    svg.append("text")
+      .attr("x", width * 0.82)
+      .attr("y", height * 0.15)
+      .attr("writing-mode", "vertical-lr")
+      .attr("dominant-baseline", "hanging")
+      .attr("text-anchor", "middle")
+      .attr("text-anchor", "start") // 文本居左对齐
+      .style("font-size", "25px") // 设置字体大小
+      .style("font-family", "STXingkai")
+      .style("fill", " #c19d3f")
+      .text("形气宗源");
+
+
+
+
+
+
+
+
+
+
+
+
+
+    // 时间轴绘制历史数据
+    const dynasties = [
+      { "name": "西汉", "start": -202, "end": 8 },
+      { "name": "东汉", "start": 25, "end": 220 },
+      { "name": "东晋", "start": 317, "end": 420 },
+      { "name": "南朝宋", "start": 420, "end": 479 },
+      { "name": "隋", "start": 581, "end": 618 },
+      { "name": "唐", "start": 618, "end": 907 },
+      { "name": "北宋", "start": 960, "end": 1127 },
+      { "name": "南宋", "start": 1127, "end": 1279 },
+      { "name": "明", "start": 1368, "end": 1644 },
+      { "name": "清", "start": 1636, "end": 1912 },
+
+    ];
+
+    // 时间范围（公元前2100年 - 公元1912年）
+    const timeRange = { start: -202, end: 2025 };
+    let bookData = [];
+
+    // 加载书籍数据
+    d3.json("第二页/data/books.json").then(data => {
+      bookData = [];
+      // 合并数据并添加category信息
+      Object.entries(data[0]).forEach(([category, books]) => {
+        books.forEach(book => {
+          book.category = category; // 添加类别属性
+          bookData.push(book);
+        });
+      });
+      drawTimeline();
+    });
+
+
+
+
+    function getPosition(time, pathSegments, totalLength) {
+
+      const pos = timeScale(time);
+      let accumulated = 0;
+      let targetSegment = null;
+
+      for (const segment of pathSegments) {
+        const segLength = segment.length || 0;
+        if (pos <= accumulated + segLength) {
+          targetSegment = segment;
+          break;
+        }
+        accumulated += segLength;
+      }
+
+      if (targetSegment) {
+        const localPos = pos - accumulated;
+        let x, y;
+        if (targetSegment.type === 'line') {
+          const direction = targetSegment.x2 > targetSegment.x1 ? 1 : -1;
+          x = targetSegment.x1 + direction * localPos;
+          y = targetSegment.y1;
+        } else if (targetSegment.type === 'arc') {
+          const angle = targetSegment.startAngle +
+            (localPos / targetSegment.radius) *
+            (targetSegment.endAngle - targetSegment.startAngle);
+          x = targetSegment.x + Math.cos(angle) * targetSegment.radius;
+          y = targetSegment.y + Math.sin(angle) * targetSegment.radius;
+        }
+        return { x, y, segment: targetSegment }; // 添加路径段信息
+      }
+      return { x: 0, y: 0, segment: null };
+    }
+
+    function drawTimeline() {
+
+
+      // 定义偏移比例
+      const offsetRatio = 0.028;
+
+      // 修正后的Font Awesome图标映射（使用有效图标编码）
+      // const iconMapping = {
+      //   "八段锦": "f66f",    // 太极图标（示例，可替换为更合适的图标）
+      //   "五禽戏": "f1b0",    // 用户图标
+      //   "易筋经": "f4ba",    // 文件图标
+      //   "大舞": "f06e",      // 书本图标
+      //   "六字诀": "f02d",     // 日历图标
+      // };
+
+      const iconMapping = {
+        "八段锦": "f02d",    // 太极图标（示例，可替换为更合适的图标）
+        "五禽戏": "f02d",    // 用户图标
+        "易筋经": "f02d",    // 文件图标
+        "大舞": "f06e",      // 书本图标
+        "六字诀": "f02d",     // 日历图标
+      };
+
+
+
+      // 为每个路径段添加唯一ID
+      const pathSegments = [
+        { id: 's1', type: 'line', x1: width * 0.024 + width * offsetRatio, y1: height * 0.204, x2: width * 0.24 + width * offsetRatio, length: width * 0.136 },
+        { id: 's2', type: 'arc', x: width * 0.24 + width * offsetRatio, y: height * 0.236, radius: height * 0.032, startAngle: 0, endAngle: Math.PI },
+        { id: 's3', type: 'line', x1: width * 0.24 + width * offsetRatio, y1: height * 0.268, x2: width * 0.064 + width * offsetRatio, length: width * 0.176 },
+        { id: 's4', type: 'arc', x: width * 0.064 + width * offsetRatio, y: height * 0.300, radius: height * 0.032, startAngle: Math.PI, endAngle: 2 * Math.PI },
+        { id: 's5', type: 'line', x1: width * 0.064 + width * offsetRatio, y1: height * 0.332, x2: width * 0.28 + width * offsetRatio, length: width * 0.216 },
+        { id: 's6', type: 'arc', x: width * 0.28 + width * offsetRatio, y: height * 0.364, radius: height * 0.032, startAngle: 0, endAngle: Math.PI },
+        { id: 's7', type: 'line', x1: width * 0.28 + width * offsetRatio, y1: height * 0.396, x2: width * 0.04 + width * offsetRatio, length: width * 0.24 },
+        { id: 's8', type: 'arc', x: width * 0.04 + width * offsetRatio, y: height * 0.428, radius: height * 0.032, startAngle: Math.PI, endAngle: 2 * Math.PI },
+        { id: 's9', type: 'line', x1: width * 0.04 + width * offsetRatio, y1: height * 0.460, x2: width * 0.24 + width * offsetRatio, length: width * 0.2 }
+      ];
+
+      // 绘制背景路径
+      pathSegments.forEach(segment => {
+        if (segment.type === 'line') {
+          svg.append("line")
+            .attr("class", "background-line")
+            .attr("x1", segment.x1)
+            .attr("y1", segment.y1)
+            .attr("x2", segment.x2 || (segment.x1 + (segment.x2 > segment.x1 ? segment.length : -segment.length)))
+            .attr("y2", segment.y1);
+        } else if (segment.type === 'arc') {
+          const arc = d3.arc()
+            .innerRadius(segment.radius)
+            .outerRadius(segment.radius)
+            .startAngle(segment.startAngle)
+            .endAngle(segment.endAngle);
+
+          svg.append("path")
+            .attr("class", "background-line")
+            .attr("d", arc)
+            .attr("transform", `translate(${segment.x},${segment.y})`);
+        }
+      });
+
+      // 创建时间比例尺
+      const totalLength = pathSegments.reduce((sum, s) => sum + (s.length || 0), 0);
+      timeScale = d3.scaleLinear()
+        .domain([timeRange.start, timeRange.end])
+        .range([0, totalLength]);
+
+      // 绘制朝代标签
+      dynasties.forEach(dynasty => {
+        const duration = dynasty.end - dynasty.start;
+        const pos = getPosition(dynasty.start + duration / 2, pathSegments, totalLength);
+
+        // 动态计算标签偏移量
+        let yOffset = 0;
+        if (pos.segment) {
+          if (pos.segment.type === 'arc') {
+            // 弧线标签上移半径的1.2倍
+            yOffset = pos.segment.radius * 1.1;
+          } else {
+            // 直线标签上移视口高度的3%
+            yOffset = -height * 0.028;
+          }
+        }
+
+        svg.append("text")
+          .attr("class", "dynasty-label")
+          .text(dynasty.name)
+          .attr("x", pos.x)
+          .attr("y", pos.y + yOffset) // 应用动态偏移
+      });
+
+      // 绘制书籍节点
+      bookData.forEach(book => {
+        const pos = getPosition(book.year, pathSegments, totalLength);
+
+
+        const iconGroup = svg.append("g")
+          .attr("class", "book-icon")
+          .attr("transform", `translate(${pos.x},${pos.y})`)
+          .style("cursor", "pointer")
+          .attr("data-category", book.category) // 添加data-category属性
+          .on("mouseover", (event) => {
+            const tooltip = d3.select("#tooltip");
+            tooltip.html(`
+          <div class="tooltip-title">${book.title}</div>
+          ${book.author ? `<div class="tooltip-author">作者：${book.author}</div>` : ''}
+          <div class="tooltip-year">年份：${formatYear(book.year)}</div>
+          <div class="tooltip-desc">${book.description}</div>
+        `)
+              .style("left", `${event.pageX + 15}px`)
+              .style("top", `${event.pageY - 15}px`)
+              .style("opacity", 1)
+
+            iconGroup.transition().duration(5000).attr("transform", `translate(${pos.x},${pos.y}) scale(1.2)`);
+          })
+          .on("mouseout", () => {
+            const tooltip = d3.select("#tooltip");
+            tooltip.style("opacity", 0);
+            iconGroup.transition().duration(200).attr("transform", `translate(${pos.x},${pos.y})`);
+          })
+          .on("click", () => {
+            console.log('图标被点击，点击的书籍:', book);
+            // 找到对应的节点数据
+            const targetNode = secondLayerNodes2.find(node => node.data.name === book.category);
+            if (targetNode) {
+              handleClick(targetNode.data);
+            }
+          });
+
+        // 添加背景圆形
+        iconGroup.append("circle")
+          .attr("r", 8)
+          .attr("fill", "#C4A484")
+          .attr("opacity", 0.3);
+
+        // 添加FontAwesome图标
+        iconGroup.append("text")
+          .attr("class", "fa-icon")
+          .attr("dy", "0.3em")
+          .attr("text-anchor", "middle")
+          .style("font-size", "12px")
+          .style("fill", "#8B4513") // 保持与原有配色一致
+          .text(() => {
+            const code = iconMapping[book.category] || iconMapping.default; // 使用默认图标处理未匹配情况
+            return String.fromCharCode(parseInt(`0x${code}`, 16)); // 正确解析十六进制编码
+          });
+      });
+    }
+
+
+
+
+    // 时间格式化函数
+    function formatYear(year) {
+      return year < 0 ? `${Math.abs(year)} BCE` : `${year} CE`;
+    }
+
+    // 初始化绘制
+    drawTimeline();
+
+    // 响应窗口变化（优化：先移除旧svg再重新绘制）
+    window.addEventListener("resize", () => {
+      d3.select("svg").remove(); // 清理旧svg
+      drawTimeline();
+    });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    // 圆形打包图部分
+    d3.json("第二页/data/data.json").then(function (data) {
+      function createCirclePacking(parentSvg) {
+        const containerWidth = window.innerWidth * 0.25;
+        const containerHeight = containerWidth;
+
+        // 创建打包图容器组
+        const packGroup = parentSvg.append("g")
+          .attr("class", "packing-container")
+          .attr("transform", `translate( ${window.innerWidth * 0.75}, ${window.innerHeight - containerHeight - 20})`);
+        // 创建 SVG 容器
+        const svg = packGroup.append("svg")
+          .attr("viewBox", `-${containerWidth / 2} -${containerHeight / 2} ${containerWidth} ${containerHeight}`)
+          .attr("width", containerWidth)
+          .attr("height", containerHeight)
+          .attr("style", `background: white; cursor: pointer;`);
+
+        // 定义颜色数组
+        const colorArray = ["#e5e1eb", "#e6d4cb", "#ead4d4", "#ffebd8", "#e8ccc7", "#e6d4cb"];
+        // 使用颜色数组创建颜色比例尺
+        const color = d3.scaleOrdinal(colorArray);
+
+        const pack = data => d3.pack()
+          .size([containerWidth, containerHeight])
+          .padding(10)
+          (d3.hierarchy(data)
+            .sum(d => d.value)
+            .sort((a, b) => b.value - a.value));
+        const root = pack(data);
+        window.packRoot = root; //
+        // 添加节点和标签
+        const node = svg.append("g")
+          .selectAll("circle")
+          .data(root.descendants().slice(1))
+          .join("circle")
+          .attr("class", "packing-container-circle")
+          .attr("fill", function (d) {
+            if (d.children) {
+              // 有子节点的大圆圈，使用颜色比例尺分配颜色
+              return color(d.data.name);
+            } else {
+              if (d.parent) {
+                const parentColor = color(d.parent.data.name);
+                if (parentColor) {
+                  const lightenedColor = d3.color(parentColor).brighter(0.8);
+                  return lightenedColor.toString();
+                }
+              }
+              // 如果没有父节点或者父节点颜色未定义，使用默认颜色
+              return "#ffebd8";
+            }
+          })
+          .attr("pointer-events", d => !d.children ? "none" : null)
+          .on("mouseover", function () { d3.select(this).attr("stroke", " #c19d3f"); })
+          .on("mouseout", function () { d3.select(this).attr("stroke", null); })
+          // 修改点击事件处理逻辑
+          .on("click", (event, d) => {
+            if (focus === d) {
+              // 如果当前聚焦在该节点，点击则缩回至根节点
+              zoom(event, root);
+            } else {
+              // 否则，聚焦到该节点
+              zoom(event, d);
+            }
+            event.stopPropagation();
+          });
+
+        const label = svg.append("g")
+          .style("font", "20px STKaiti")
+          .attr("pointer-events", "none")
+          .attr("text-anchor", "middle")
+          .attr("class", "container-circle")
+          .selectAll("text")
+          .data(root.descendants())
+          .join("text")
+          .style("fill-opacity", d => d.parent === root ? 1 : 0)
+          .style("display", d => d.parent === root ? "inline" : "none")
+          .text(d => d.data.name);
+
+        // 保持原有缩放逻辑...
+        let focus = root;
+        let view;
+        zoomTo([focus.x, focus.y, focus.r * 2]);
+
+        function zoomTo(v) {
+          const k = containerWidth / v[2];
+          view = v;
+          label.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
+          node.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
+          node.attr("r", d => d.r * k);
+        }
+
+        function zoom(event, d) {
+          const focus0 = focus;
+          focus = d;
+          const transition = svg.transition()
+            .duration(event.altKey ? 7500 : 750)
+            .tween("zoom", d => {
+              const i = d3.interpolateZoom(view, [focus.x, focus.y, focus.r * 2]);
+              return t => zoomTo(i(t));
+            });
+
+          label
+            .filter(function (d) { return d.parent === focus || this.style.display === "inline"; })
+            .transition(transition)
+            .style("fill-opacity", d => d.parent === focus ? 1 : 0)
+            .on("start", function (d) { if (d.parent === focus) this.style.display = "inline"; })
+            .on("end", function (d) { if (d.parent !== focus) this.style.display = "none"; });
+        }
+      }
+
+      // 在时间轴 SVG 中创建打包图
+      createCirclePacking(svg);
+    });
+
+
+
+
+
+
+
+
+
+
+    //圆形主图
+    let showAllLinks = false;
+    const innerRadius = window.innerWidth * 0.18;
+    const outerRadius = window.innerWidth * 0.22;
+
+    // 添加动态文本容器
+    const dynamicText = svg.append("foreignObject")
+      .attr("x", width * 0.85)
+      .attr("y", height * 0.1)
+      .attr("width", width * 0.15)
+      .attr("height", height * 0.35)
+      .attr("id", "dynamic-content")
+      .html(`
+    <div id="dynamic-content" style="white-space: pre-wrap; font-family: STKaiti; 
+      font-size: 20px; color: #666; height: 100%; overflow-y: auto; margin : 0 ;"></div>
+  `);
+
+
+
+    // 布局函数
+    function cluster(root) {
+      d3.cluster()
+        .size([360, outerRadius - innerRadius])
+        .separation((a, b) => 1)
+        (root);
+    }
+
+    // 修复 maxLength 函数
+    const maxLength = d => d.children ? d3.max(d.children, maxLength) + 1 : 1;
+
+    function setRadius(root, y0, dy) {
+      root.eachAfter(node => {
+        node.radius = y0 + node.depth * dy;
+      });
+      // 调试打印
+      root.eachAfter(node => {
+        console.log(node.data.name, "depth:", node.depth, "radius:", node.radius);
+      });
+    }
+
+    // 修改颜色配置部分（替换原setColor函数）
+    // const colors = ['#ec9a86', '#d58677', '#ce9e96', '#b7bda0', '#c6b4d8']; // 五种颜色
+    const colors = ["#e5c6c3", "#ce9e96", "#bd9e84", "#e0c2d6", "#d0caa6"];
+    //const colors = ["#f0c9ba", "#ca8f7a", "#c46f4d", "#c86a58", "#c64e2f"];
+
+    function setColor(root) {
+      root.each(node => {
+        if (node !== root) {
+          // 根据节点在兄弟节点中的索引分配颜色
+          const parent = node.parent;
+          const index = parent.children ? parent.children.indexOf(node) : 0;
+          node.color = colors[index % colors.length];
+        }
+      });
+    }
+
+    // 路径生成器
+    const linkExtensionConstant = d3.linkRadial()
+      .angle(d => d.x * Math.PI / 180)
+      .radius(d => d.radius * 1.1); // 延长 10%
+
+    const linkConstant = d3.linkRadial()
+      .angle(d => d.x * Math.PI / 180)
+      .radius(d => d.radius * 1.1); // 延长 10%
+
+    const linkExtensionVariable = d3.linkRadial()
+      .angle(d => d.x * Math.PI / 180)
+      .radius(d => (d.parent.radius + (d.radius - d.parent.radius) * 0.8) * 1.1); // 延长 10%
+
+    const linkVariable = d3.linkRadial()
+      .angle(d => d.x * Math.PI / 180)
+      .radius(d => (d.parent.radius + (d.radius - d.parent.radius) * 0.8) * 1.1); // 延长 10%
+
+    // 添加用于显示文字介绍的元素
+    const tooltip = d3.select("body").append("div")
+      .attr("class", "cir-tooltip") // 修改类名
+
+    // 记录当前点击的节点和点击状态
+    let currentClickedNode = null;
+    let isInnerHighlight = false;
+
+    // 加载数据并创建图表
+    Promise.all([
+      d3.json("第二页/data/data1.json"),
+      d3.json("第二页/data/picture.json")
+    ]).then(([data, pictureData]) => {
+      // 修复子节点字段名称
+      const root = d3.hierarchy(data, d => d.branchset)
+        .sum(d => d.branchset ? 0 : 1);
+
+      cluster(root);
+
+      const y0 = root.data.name ? 0 : innerRadius / maxLength(root);
+      const dy = (outerRadius - innerRadius) / (root.height + 1) * 6;
+
+      console.log('y0:', y0);
+      console.log('dy:', dy);
+
+      setRadius(root, y0, dy);
+      setColor(root);
+
+      const cir_svg = svg.append("g")
+        .attr("id", "cir_svg") // 添加ID便于后续调整
+        .attr("transform", `translate(${width / 1.78}, ${height / 1.8})`) // 平移到页面中心
+        .attr("viewBox", [
+          -outerRadius * 2,
+          -outerRadius * 1.5,
+          outerRadius * 7,
+          outerRadius * 7
+        ])
+        .attr("font-family", "STKaiti")
+        .attr("font-size", 14);
+
+      // 初始显示第一段话
+      dynamicText.html(`
+    <div style="white-space: pre-wrap; font-family: STKaiti; font-size: 20px; color: #666;">
+      导引术源于新石器时代巫舞,周代入医,《内经》载其疗疾。马王堆《导引图》记44式。
+     道家创丹道导引，医家衍五禽戏、八段锦，形成“形引气、息运经”体系。现代研究证实其调节脑波、筋膜，改善代谢。
+    </div>`)
+
+      cir_svg.on("click", function () {
+        showAllLinks = !showAllLinks;
+        if (showAllLinks) {
+          // 显示所有连线
+          link.style("opacity", 1);
+          linkExtension.style("opacity", 1);
+          // 隐藏工具提示和图片
+          tooltip.style("opacity", 0);
+          image.attr("visibility", "hidden");
+
+          // 更新线段颜色为父节点颜色
+          link.style("stroke", d => d.source.color);
+          linkExtension.style("stroke", d => d.source.color);
+        } else {
+          // 隐藏所有连线
+          link.style("opacity", 0);
+          linkExtension.style("opacity", 0);
+        }
+      });
+
+
+
+
+
+
+      // 获取第二层节点（根节点的子节点）
+      const secondLayerNodes = root.children;
+
+      if (secondLayerNodes.length === 0) {
+        console.error("No second layer nodes found");
+        return;
+      }
+
+      // 递归统计每个根节点下的招式数量
+      function countLeaves(node) {
+        if (node.children) {
+          return node.children.reduce((acc, child) => acc + countLeaves(child), 0);
+        }
+        return 1;
+      }
+
+      // 计算每个根节点下的招式数量
+      secondLayerNodes.forEach(node => {
+        node.data.leafCount = countLeaves(node);
+      });
+
+      // 计算总招式数量
+      const totalLeaves = d3.sum(secondLayerNodes, d => d.data.leafCount);
+
+      // 计算最大半径
+      const maxRadius = d3.max(secondLayerNodes, d => d.radius);
+
+      // 添加圆形元素
+      cir_svg.append("circle")
+        .attr("cx", 0)
+        .attr("cy", 0)
+        .attr("r", maxRadius)
+        .attr("fill", "none")
+        .attr("stroke", "#9e8576")
+        .attr("stroke-width", 2)
+
+      // 画一个半径略小于最大半径的圆
+      const smallerRadius = maxRadius * 0.89;
+      cir_svg.append("circle")
+        .attr("cx", 0)
+        .attr("cy", 0)
+        .attr("r", smallerRadius)
+        .attr("fill", "none")
+        .attr("stroke", "#9e8576")
+        .attr("stroke-width", 2)
+
+      // 添加圆弧填充
+      const arc = d3.arc()
+        .innerRadius(smallerRadius)
+        .outerRadius(maxRadius);
+
+      let startAngle = 0;
+      const arcPaths = [];
+      secondLayerNodes.forEach(node => {
+        const endAngle = startAngle + (node.data.leafCount / totalLeaves) * 2 * Math.PI;
+
+        // 添加圆弧填充
+        const path = cir_svg.append("path")
+          .attr("d", arc({ startAngle, endAngle }))
+          .attr("fill", node.color)
+          .attr("stroke", " #c19d3f");
+        arcPaths.push({ path, node, startAngle, endAngle });
+
+        startAngle = endAngle;
+      });
+
+      // 添加标注文本，让文字与每层招式根节点的位置相对应
+      arcPaths.forEach(({ path, node, startAngle, endAngle }) => {
+        // 计算圆弧的中间角度
+        const midAngle = (startAngle + endAngle) / 2 - 45.55;
+
+        // 计算文本的 x 和 y 坐标，考虑圆弧的内半径和外半径
+        const textRadius = (smallerRadius + maxRadius) / 2;
+        const textX = textRadius * Math.cos(midAngle);
+        const textY = textRadius * Math.sin(midAngle);
+
+        // 调整文本方向和对齐方式
+        let textAnchor = "middle";
+        let rotateAngle = (midAngle * 180 / Math.PI) + 90;
+        if (rotateAngle > 90 && rotateAngle < 270) {
+          textAnchor = "middle";
+          rotateAngle += 180;
+        }
+
+        // 获取当前节点（招式根节点）的名称
+        const rootName = node.data.name;
+        // 点击事件绑定在path元素
+        path.on("click", () => handleClick(node.data)); // 传递当前节点对象
+
+        // 添加标注文本
+        cir_svg.append("text")
+          .attr("x", textX)
+          .attr("y", textY)
+          .attr("text-anchor", textAnchor)
+          .attr("dominant-baseline", "middle")
+          .attr("transform", `rotate(${rotateAngle}, ${textX}, ${textY})`)
+          .text(rootName)
+          .attr("fill", "black")
+          .style("font-size", "13px")
+          .on("click", () => handleClick(node.data)); // 传递当前节点对象
+
+        // 点击事件绑定在path元素
+        path.on("click", () => handleClick(node.data));
+
+      });
+
+      function handleClick(data) {
+        const targetCategory = data.name; // 获取点击的类别名称
+        console.log('handleClick 函数被调用，点击的数据:', data);
+
+        // 计算屏幕中央坐标
+        const centerX = window.innerWidth / 3;
+        const centerY = window.innerHeight / 5;
+
+        // 保存所有目标图标的原始位置（若尚未保存）
+        d3.selectAll(`.book-icon[data-category="${targetCategory}"]`)
+          .each(function (d) {
+            if (!this._originalPos) { // 仅首次记录原始位置
+              const bbox = this.getBBox(); // 获取图标当前位置
+              this._originalPos = { x: bbox.x + bbox.width / 2, y: bbox.y + bbox.height / 2 };
+            }
+          });
+
+
+        // 找到对应的历史轴图标并移动到屏幕中央，同时放大
+        d3.selectAll(`.book-icon[data-category="${targetCategory}"]`)
+          .each(function (d) {
+            // 保存原始位置以便后续恢复（如果需要）
+            this._originalPos = this._originalPos || {
+              x: d3.select(this).attr("cx"),
+              y: d3.select(this).attr("cy")
+            };
+          })
+          .transition()
+          .duration(300)
+          .attr("transform", `translate(${centerX}, ${centerY}) scale(1.5)`) // 移动到中央并放大
+          .style("cursor", "zoom-out"); // 改变鼠标样式
+
+
+
+
+
+        const iconCount = d3.selectAll('.book-icon').size();
+        console.log('点击后，SVG 中的图标数量:', iconCount);
+        // 重置所有节点高亮
+        d3.selectAll('.packing-container-circle')
+          .attr('stroke', null)
+          .attr('stroke-width', 0);
+
+        const targetTypes = [];
+        for (let i = 1; i <= 9; i++) {
+          if (data[`type${i}`]) {
+            targetTypes.push(data[`type${i}`]);
+          }
+        }
+
+        if (currentClickedNode === data) {
+          // 如果再次点击同一个节点，切换到点亮内层节点状态
+          isInnerHighlight = !isInnerHighlight;
+        } else {
+          // 如果点击新节点，重置状态并点亮外层节点
+          currentClickedNode = data;
+          isInnerHighlight = false;
+        }
+
+
+        // 点亮外层节点
+        targetTypes.forEach(type => {
+          const matchingNodes = window.packRoot.descendants().filter(node => node.data.name === type);
+          d3.selectAll('.packing-container-circle')
+            .filter(n => matchingNodes.includes(n))
+            .attr('stroke', '#c19d3f')
+            .attr('stroke-width', 2);
+        });
+
+
+        //文字切换
+        // 加载并显示introduction内容
+        const introduction = data.introduction || "暂无详细描述";
+        d3.select("#dynamic-content").html(`
+    <div style="white-space: pre-wrap; line-height: 1;">
+      ${introduction.split('\n').map(p => `<p style="text-indent: 2em;" margin: 0;>${p}</p>`).join('')}
+    </div>
+  `);
+
+        // 修改文字样式
+        d3.select("#dynamic-content")
+          .style("font-size", "20px")
+          .style("color", "#333")
+          .style("font-family", "STKaiti")
+          .style("padding", "10px")
+          .style("border-radius", "5px");
+      }
+
+
+
+      // function handleClick(data) {
+      //   // 重置所有节点高亮
+      //   d3.selectAll('.packing-container-circle')
+      //     .attr('stroke', null)
+      //     .attr('stroke-width', 0);
+
+      //   currentHighlightedTypes = [];
+      //   currentHighlightedData = [];
+      //   for (let i = 1; i <= 3; i++) {
+      //     if (data[`type${i}`]) {
+      //       currentHighlightedTypes.push(data[`type${i}`]);
+      //       currentHighlightedData.push(data);
+      //     }
+      //   }
+
+      //   // 点亮与 type1, type2, type3 有关的大圆圈
+      //   currentHighlightedTypes.forEach(type => {
+      //     const matchingNodes = window.packRoot.descendants().filter(node => node.data.name === type && node.children);
+      //     matchingNodes.forEach(matchingNode => {
+      //       const outerCircle = d3.selectAll('.packing-container-circle')
+      //         .filter(n => n === matchingNode);
+      //       if (outerCircle.size() > 0) {
+      //         outerCircle.attr('stroke', '#c19d3f')
+      //           .attr('stroke-width', 2);
+      //       }
+      //     });
+      //   });
+
+      // 添加链接扩展，过滤掉包含根节点的链接
+      const linkExtension = cir_svg.append("g")
+        .attr("fill", "none")
+        .attr("stroke", "#000")
+        .attr("stroke-opacity", 0.25)
+        .selectAll("path")
+        .data(root.links().filter(d => d.source !== root && d.target !== root))
+        .join("path")
+        .each(function (d) { d.target.linkExtensionNode = this; })
+        .attr("d", linkExtensionConstant);
+
+      // 添加主链接，过滤掉包含根节点的链接
+      // 修改连线颜色设置（原link设置部分）
+      const link = cir_svg.append("g")
+        .attr("fill", "none")
+        .selectAll("path")
+        .data(root.links().filter(d => d.source !== root && d.target !== root))
+        .join("path")
+        .each(function (d) { d.target.linkNode = this; })
+        .attr("d", linkConstant)
+        .attr("stroke", d => d.source.color) // 使用源节点颜色保持统一
+        .attr("stroke-width", 1.5);
+
+      // 添加标签，过滤掉根节点
+      const labels = cir_svg.append("g")
+        .selectAll("text")
+        .data(root.leaves().filter(d => d !== root))
+        .join("text")
+        .attr("dy", ".31em")
+        .attr("transform", d => `rotate(${d.x - 90}) translate(${innerRadius + 4},0)${d.x < 180 ? "" : " rotate(180)"}`)
+        .attr("text-anchor", d => d.x < 180 ? "start" : "end")
+        .text(d => d.data.name.replace(/_/g, " "))
+        .on("mouseover", mouseovered(true))
+        .on("mouseout", mouseovered(false));
+
+      // 添加图片元素
+      const image = cir_svg.append("image")
+        .attr("class", "zs_image")
+        .attr("width", 0)
+        .attr("height", 0)
+        .attr("visibility", "hidden");
+
+
+
+
+
+
+      // 视频播放点击
+
+      // 创建新的 SVG 用于放置小圆点
+      const dotSvg = svg.append("g")
+        .attr("transform", `translate(${width * 0.86}, ${height * 0.5})`);
+
+      // 小圆点的半径
+      const dotRadius = 6;
+      // 小圆点之间的间距
+      const dotSpacing = 20;
+
+      // 定义颜色数组
+      const colorArray = ["#e5c6c3", "#ce9e96", "#bd9e84", "#e0c2d6", "#d0caa6"];
+
+      // 模拟视频 URL 数组，实际使用时需要替换为真实的视频 URL
+      const videoUrls = [
+        "第二页/data/八段锦.mp4",
+        "八段锦.mp4",
+        "video3.mp4",
+        "video4.mp4",
+        "video5.mp4"
+      ];
+
+      // 添加五个小圆点
+      for (let i = 0; i < 5; i++) {
+        dotSvg.append("circle")
+          .attr("cx", i * (dotRadius * 2 + dotSpacing))
+          .attr("cy", 0)
+          .attr("r", dotRadius)
+          .attr("fill", colorArray[i])
+          .on("click", function () {
+            playVideo(i);
+          });
+      }
+
+      // 播放视频的函数
+      function playVideo(index) {
+        // 移除之前的视频容器
+        dotSvg.selectAll("foreignObject").remove();
+
+        // 视频容器
+        const videoWidth = width * 0.25;
+        const videoHeight = height * 0.2;
+        const videoContainer = svg.append("foreignObject")
+          .attr("x", width * 0.7)
+          .attr("y", height * 0.3)
+          .attr("width", videoWidth)
+          .attr("height", videoHeight)
+          .html(`
+        <video width="100%" height="100%" style="object-fit: cover;" controls></video>
+      `);
+
+        const videoPlayer = videoContainer.node().querySelector('video');
+        videoPlayer.src = videoUrls[index];
+        videoPlayer.play();
+
+        // 定义暂停事件处理函数
+        const pauseHandler = function () {
+          videoContainer.style("display", "none");
+          // 移除之前的视频容器
+          dotSvg.selectAll("foreignObject").remove();
+          // 移除事件监听器，防止内存泄漏
+          videoPlayer.removeEventListener('pause', pauseHandler);
+        };
+
+        // 为视频添加暂停事件监听器
+        videoPlayer.addEventListener('pause', pauseHandler);
+      }
+
+
+
+
+
+
+
+
+
+
+
+
+      // 扇形分区//经络展示图
+      // 定义圆心和半径
+      const centerX = window.innerWidth * 0.15;
+      const centerY = window.innerHeight * 0.75;
+      const outRadius = window.innerWidth * 0.12;
+      const inRadius = window.innerWidth * 0.07;
+
+      // 定义每个扇形的角度
+      const angleStep = 2 * Math.PI / 12;
+      // 三十度对应的弧度
+      const rotationAngle = Math.PI / 12;
+
+      // 读取 JSON 文件
+      d3.json('第二页/data/picture2.json').then(data => {
+        // 循环绘制 12 个扇形及添加图片
+        for (let i = 0; i < 12; i++) {
+          // 减去旋转角度
+          const startAngle = i * angleStep - rotationAngle;
+          const endAngle = (i + 1) * angleStep - rotationAngle;
+
+
+          // 计算扇形的路径
+          const pathData = `M ${centerX + inRadius * Math.cos(startAngle)},${centerY + inRadius * Math.sin(startAngle)}
+                    A ${inRadius},${inRadius} 0 0 1 ${centerX + inRadius * Math.cos(endAngle)},${centerY + inRadius * Math.sin(endAngle)}
+                    L ${centerX + outRadius * Math.cos(endAngle)},${centerY + outRadius * Math.sin(endAngle)}
+                    A ${outRadius},${outRadius} 0 0 0 ${centerX + outRadius * Math.cos(startAngle)},${centerY + outRadius * Math.sin(startAngle)}
+                    Z`;
+
+          // 添加裁剪路径
+          const clipPath = svg.append("clipPath")
+            .attr("id", `clip-${i}`)
+            .append("path")
+            .attr("d", pathData);
+
+          // 添加路径元素
+          svg.append("path")
+            .attr("d", pathData)
+            .attr("fill", "none")
+            .attr("stroke", "none")
+            .attr("stroke-width", 2.5)
+            .on(" mouseovered", mouseovered(false));
+
+          // 添加图片并应用裁剪路径
+          svg.append("image")
+            .attr("xlink:href", data[i].imagePath)
+            .attr("x", centerX - outRadius)
+            .attr("y", centerY - outRadius)
+            .attr("width", outRadius * 2)
+            .attr("height", outRadius * 2)
+            .attr("clip-path", `url(#clip-${i})`);
+
+
+        }
+
+        // 在内部圆添加一张照片
+        const innerCircleRadius = inRadius; // 可根据需要调整内部圆照片的大小
+        const innerCircleImagePath = '第二页/data/经络1.jpg'; // 替换为实际的图片路径
+
+        svg.append("circle")
+          .attr("cx", centerX)
+          .attr("cy", centerY)
+          .attr("r", innerCircleRadius)
+          .attr("stroke", "#9e8576")
+          .attr("stroke-width", 2.5);
+
+
+
+        svg.append("image")
+          .attr("xlink:href", innerCircleImagePath)
+          .attr("x", centerX - innerCircleRadius)
+          .attr("y", centerY - innerCircleRadius)
+          .attr("width", innerCircleRadius * 2)
+          .attr("height", innerCircleRadius * 2)
+          .attr("clip-path", `url(#inner-circle-clip)`);
+
+        // 添加内部圆的裁剪路径
+        const innerCircleClipPath = svg.append("clipPath")
+          .attr("id", "inner-circle-clip")
+          .append("circle")
+          .attr("cx", centerX)
+          .attr("cy", centerY)
+          .attr("r", innerCircleRadius)
+          .on(" mouseovered", mouseovered(false));
+
+      }).catch(error => {
+        console.error('Error loading JSON file:', error);
+      });
+
+
+
+
+
+
+      function mouseovered(active) {
+        return function (event, d) {
+          d3.select(this).classed("label--active", active);
+
+          if (active) {
+            // 取消之前所有扇形区域内照片的高亮
+            d3.json('第二页/data/picture2.json').then(data => {
+              data.forEach((_, index) => {
+                d3.selectAll('image')
+                  .filter((_, i) => i === index)
+                  .style("filter", "brightness(100%)");
+              });
+            }).catch(error => {
+              console.error('Error loading JSON file:', error);
+            });
+
+            // 显示当前节点到根节点的线
+            let currentNode = d;
+            while (currentNode.parent) {
+              d3.select(currentNode.linkNode).style("opacity", 1).attr("stroke", root.color);
+              d3.select(currentNode.linkExtensionNode).style("opacity", 1).attr("stroke", root.color);
+              currentNode = currentNode.parent;
+            }
+
+            // 显示图片和文字
+            const pictureName = d.data.name.replace(/_/g, " ");
+            const pictureUrl = pictureData[pictureName];
+            if (pictureUrl) {
+              const diameter = smallerRadius * 2;
+              image.attr("width", diameter)
+                .attr("height", diameter)
+                .attr("x", -smallerRadius)
+                .attr("y", -smallerRadius)
+                .attr("href", pictureUrl)
+                .style("filter", "brightness(100%)")
+                .attr("visibility", "visible");
+            }
+
+            const description = d.data.description || "暂无介绍";
+            tooltip.transition()
+              .duration(200)
+              .style("opacity", 1);
+            tooltip.text(description);
+
+            // 新增：高亮对应的扇形区域内的照片
+            const targetZangfu1 = d.data.脏腑1;
+            const targetZangfu2 = d.data.脏腑2;
+            d3.json('第二页/data/picture2.json').then(data => {
+              data.forEach((item, index) => {
+                if (item.脏腑 === targetZangfu1 || item.脏腑 === targetZangfu2) {
+                  // 找到对应的扇形区域内的图片并高亮
+                  d3.selectAll('image')
+                    .filter((_, i) => i === index)
+                    .style("filter", "brightness(80%)");
+                }
+              });
+            }).catch(error => {
+              console.error('Error loading JSON file:', error);
+            });
+
+            // 新增：根据经络属性更新中间图片
+            const targetJingluo1 = d.data.经脉;
+
+            d3.json('第二页/data/经络.json').then(data => {
+              data.forEach(item => {
+                if (item.经络 === targetJingluo1) {
+                  const innerCircleImage = d3.select("image[clip-path='url(#inner-circle-clip)']");
+                  innerCircleImage.attr("xlink:href", item.imagePath);
+                }
+              });
+            }).catch(error => {
+              console.error('Error loading 经络.json:', error);
+            });
+
+
+          } else {
+            if (!showAllLinks) {
+              // 隐藏所有连线（仅当未处于全显状态时）
+              linkExtension.style("opacity", 0);
+              link.style("opacity", 0);
+            }
+
+            // 隐藏图片
+            image.attr("visibility", "visible");
+            // 隐藏工具提示
+            tooltip.transition()
+              .duration(500)
+              .style("opacity", 0);
+          }
+        };
+      }
+    }).catch(error => {
+      console.error('Error loading data:', error);
+    });
+
+
+
+
+
+
+
+
+
+
+
+
+    // 在窗口调整事件中添加对圆形图的位置更新
+    window.addEventListener("resize", () => {
+      // 时间轴更新
+      svg.attr("width", window.innerWidth)
+        .attr("height", window.innerHeight);
+      drawTimeline();
+
+      // 圆形图位置更新
+      const newWidth = window.innerWidth;
+      const newHeight = window.innerHeight;
+      d3.select("#cir_svg")
+        .attr("transform", `translate(${newWidth / 1.78}, ${newHeight / 1.8})`);
+
+      // 打包图容器更新
+      const containerWidth = window.innerWidth * 0.3;
+      const containerHeight = window.innerWidth * 0.3;
+      d3.select(".packing-container")
+        .attr("transform", `translate( ${window.innerWidth * 0.75}, ${window.innerHeight - containerHeight - 20})`);
+
+
+      // 图标位置更新（添加以下代码）
+      const bookIcons = d3.selectAll('.book-icon');
+      bookIcons.each(function (d) {
+        if (d && d.data) {
+          const pos = getPosition(d.data.year, pathSegments, totalLength);
+          d3.select(this).attr("transform", `translate(${pos.x},${pos.y})`);
+        }
+      });
+
+    });
+
+
+
+
+  </script>
+</body>
+
+</html>

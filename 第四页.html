@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>D3.js 多层圆圈弧线 - 响应式</title>
+  <script src="plugins/d3.v7.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <style>
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100%;
+      background-image: url("background4.jpg");
+      background-size: 100% 100%;
+      background-repeat: no-repeat;
+      background-position: center;
+    }
+
+    .long-line {
+      stroke: #bd9e84;
+      stroke-width: 1;
+    }
+
+    .long-line1 {
+      stroke: #764F35;
+      stroke-width: 2;
+    }
+
+    .long-line2 {
+      stroke: #b7bda0;
+      stroke-width: 2;
+    }
+
+    .long-line3 {
+      stroke: #93aec1;
+      stroke-width: 2;
+    }
+
+    .long-line4 {
+      stroke: #deb0bd;
+      stroke-width: 2;
+    }
+
+    /* 时间轴渐变样式 */
+    .time-axis {
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke: #4c484f;
+    }
+
+    /* 时间标记样式 */
+    .time-marker {
+      fill: #d4af37;
+    }
+
+    .time-marker:hover {
+      fill: #ffd700;
+    }
+
+    /* 时间标签样式 */
+    .time-label {
+      font-family: 'STXingkai', Tahoma, Geneva, Verdana, sans-serif;
+      font-size: 12px;
+      fill: #4c484f;
+      text-anchor: middle;
+    }
+
+    /* 图片容器样式 */
+    .image-container {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      overflow: hidden;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      border: 2px solid #d4af37;
+    }
+
+    .image-container:hover {
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    }
+
+    .image-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* 姓名标签样式 */
+    .name-label {
+      position: absolute;
+      font-family: 'STKaiti', Tahoma, Geneva, Verdana, sans-serif;
+      font-size: 13px;
+      color: black;
+      text-align: center;
+      width: 60px;
+    }
+
+    /* 新增的竖着的文字标签样式 */
+    .vertical-label {
+      font-family: 'STXingkai', Tahoma, Geneva, Verdana, sans-serif;
+      font-size: 16px;
+      fill: #4c484f;
+      writing-mode: vertical-lr;
+      text-anchor: middle;
+      position: absolute;
+      left: 20px;
+    }
+
+    .text-box1 {
+      position: absolute;
+      padding: 5px;
+      font-family: 'STKaiti', Tahoma, Geneva, Verdana, sans-serif;
+      font-size: 15px;
+      color: #4c484f;
+      width: 300px;
+      word-wrap: break-word;
+      max-height: 200px;
+      /* 添加最大高度 */
+      overflow-y: auto;
+      /* 添加滚动条 */
+    }
+
+    .text-box2 {
+      position: absolute;
+      padding: 5px;
+      font-family: 'STKaiti', Tahoma, Geneva, Verdana, sans-serif;
+      font-size: 15px;
+      color: #4c484f;
+      width: 300px;
+      word-wrap: break-word;
+      max-height: 200px;
+      /* 添加最大高度 */
+      overflow-y: auto;
+      /* 添加滚动条 */
+    }
+
+    .text-box3 {
+      position: absolute;
+      padding: 5px;
+      font-family: 'STKaiti', Tahoma, Geneva, Verdana, sans-serif;
+      font-size: 15px;
+      color: #4c484f;
+      width: 300px;
+      word-wrap: break-word;
+      max-height: 200px;
+      /* 添加最大高度 */
+      overflow-y: auto;
+      /* 添加滚动条 */
+    }
+
+    .text-box4 {
+      position: absolute;
+      padding: 5px;
+      font-family: 'STKaiti', Tahoma, Geneva, Verdana, sans-serif;
+      font-size: 15px;
+      color: #4c484f;
+      width: 300px;
+      word-wrap: break-word;
+      max-height: 200px;
+      /* 添加最大高度 */
+      overflow-y: auto;
+      /* 添加滚动条 */
+    }
+    .vertical-label{
+      cursor: pointer;
+    }
+  </style>
+    <style>
+        #pageSelector{
+            font-size:25px;
+            border-radius: 5px;
+             border: 1px solid #ccc;
+            padding: 8px 15px;
+            font-family: "STXingkai",
+        /* Windows 标准名称 */
+        "华文行楷",
+        /* 中文名称 */
+        "Xingkai SC",
+        /* macOS/iOS 名称 */
+        "STXinwei",
+        /* 备用名称 */
+        "KaiTi",
+        /* 回退到楷体 */
+        cursive;;
+            cursor: pointer;
+            background-color: white;
+        }
+    </style>
+</head>
+  <!--下拉框 -->
+    <div style="position: absolute; top: 20px; right: 20px; z-index: 1000; padding: 10px;">
+        <label for="pageSelector"></label><select id="pageSelector">
+        <option value="第四页.html">杏林春秋</option>
+                <option value="第一页.html">流派渊承</option>
+                <option value="第二页.html">导引千式</option>
+        <option value="第三页.html">节气养和</option>
+                <option value="首页.html">首页</option>
+    </select>
+</div>
+<script>
+    // 获取下拉框元素
+    const pageSelector = document.getElementById('pageSelector');
+
+    // 添加change事件监听器
+    pageSelector.addEventListener('change', function() {
+        // 获取选中的值
+        const selectedPage = this.value;
+
+        // 如果选择了有效选项，则跳转页面
+        if (selectedPage) {
+            window.location.href = selectedPage;
+        }
+    });
+</script>
+<body>
+  <script>
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    let textBox1, textBox2, textBox3, textBox4;
+    let currentScientist;
+    let currentSection = "生平经历"; // 初始显示生平经历
+
+
+    const svg = d3.select("body")
+      .append("svg")
+      .attr("width", window.innerWidth)
+      .attr("height", window.innerHeight);
+
+
+    // 绘制横线
+    svg.append("line")
+      .attr("class", "long-line")
+      .attr("x1", 0)
+      .attr("y1", height * 0.1)
+      .attr("x2", width)
+      .attr("y2", height * 0.1);
+
+
+    // 添加文本标签
+    svg.append("text")
+      .attr("class", "title")
+      .attr("x", width * 0.03)
+      .attr("y", height * 0.08)
+      .attr("text-anchor", "start")
+      .style("font-size", "45px")
+      .style("font-family", "STXingkai")
+      .style("fill", "black")
+      .text("溯古医源・杏林春秋");
+
+
+
+    d3.json("data/第四页/人物/人物.json")
+      .then(function (data) {
+        // 在这里处理加载成功后的逻辑
+        const medicalScientists = data.medical_scientists;
+
+
+
+
+
+        // 时间轴数据
+        const timelineData = [
+          { year: "先秦", image: "data/第四页/人物/扁鹊.jpg", name: "扁鹊" },
+          { year: "秦汉", image: "data/第四页/人物/张仲景.jpg", name: "张仲景" },
+          { year: "", image: "data/第四页/人物/华佗.jpg", name: "华佗" },
+          { year: "魏晋", image: "data/第四页/人物/王叔和.jpg", name: "王叔和" },
+          { year: "", image: "data/第四页/人物/皇甫谧.jpg", name: "皇甫谧" },
+          { year: "隋唐", image: "data/第四页/人物/孙思邈.jpg", name: "孙思邈" },
+          { year: "宋", image: "data/第四页/人物/钱乙.jpg", name: "钱乙" },
+          { year: "金元", image: "data/第四页/人物/朱震亨.jpg", name: "朱震亨" },
+          { year: "明", image: "data/第四页/人物/李时珍.jpg", name: "李时珍" },
+          { year: "清", image: "data/第四页/人物/叶桂.jpg", name: "叶桂" },
+        ];
+
+        const timelineY = height * 0.25;
+
+        // 定义时间轴渐变
+        const defs = svg.append("defs");
+        const gradient = defs.append("linearGradient")
+          .attr("id", "time-axis-gradient")
+          .attr("x1", "0%")
+          .attr("y1", "0%")
+          .attr("x2", "100%")
+          .attr("y2", "0%");
+
+        gradient.append("stop")
+          .attr("offset", "0%")
+          .attr("stop-color", "#d4af37");
+        gradient.append("stop")
+          .attr("offset", "50%")
+          .attr("stop-color", "#ffd700");
+        gradient.append("stop")
+          .attr("offset", "100%")
+          .attr("stop-color", "#d4af37");
+
+        // 绘制第一个时间轴，靠左，长度为屏幕宽度的 40%
+        const timeAxisStartLeft = width * 0.03;
+        const timeAxisEndLeft = timeAxisStartLeft + width * 0.4;
+        svg.append("line")
+          .attr("class", "time-axis")
+          .attr("x1", timeAxisStartLeft)
+          .attr("y1", timelineY)
+          .attr("x2", timeAxisEndLeft)
+          .attr("y2", timelineY);
+
+        // 绘制第一个时间轴的时间标记、标签和图片
+        timelineData.forEach((d, i) => {
+          const x = timeAxisStartLeft + (width * 0.4 / (timelineData.length - 1)) * i;
+
+          // 绘制时间标记（圆形）
+          svg.append("circle")
+            .attr("class", "time-marker")
+            .attr("cx", x)
+            .attr("cy", timelineY)
+            .attr("r", 4);
+
+          // 确定标签位置（上下错落）
+          const labelYOffset = (i % 2 === 0) ? 15 : -15;
+          const labelY = timelineY + labelYOffset;
+
+          // 去掉时间标签背景
+          // 不再添加时间标签背景的代码
+
+          // 添加时间标签
+          svg.append("text")
+            .attr("class", "time-label")
+            .attr("x", x)
+            .attr("y", labelY + 7.5)
+            .text(d.year);
+
+          // 确定图片位置（上下错落）
+          const yOffset = (i % 2 === 0) ? -100 : 30;
+          const y = timelineY + yOffset;
+
+          // 添加图片容器
+          const imageContainer = d3.select("body")
+            .append("div")
+            .attr("class", "image-container")
+            .style("left", `${x - 40}px`)
+            .style("top", `${y}px`);
+
+
+
+          // 在定义 textBox 变量时，假设已经有四个文本框，分别为 textBox1, textBox2, textBox3, textBox4
+
+
+          // 添加图片
+          imageContainer.append("img")
+            .attr("src", d.image)
+            .on("click", function () {
+              currentScientist = medicalScientists.find(scientist => scientist.name === d.name);
+              if (currentScientist && Array.isArray(currentScientist.生平经历)) {
+                const bioText = currentScientist.生平经历;
+                textBox1.html(bioText[0]);
+                textBox2.html(bioText[1]);
+                textBox3.html(bioText[2]);
+                textBox4.html(bioText[3]);
+                currentSection = "生平经历"; // 更新当前部分为生平经历
+              } else {
+                console.error("数据结构不符合预期，无法显示生平经历");
+              }
+            });
+
+
+          // 添加姓名标签
+          d3.select("body")
+            .append("div")
+            .attr("class", "name-label")
+            .style("left", `${x - 30}px`)
+            .style("top", `${y + 70}px`)
+            .text(d.name);
+        });
+
+        const timelineData2 = [
+          { year: "晚清", image: "data/第四页/人物/唐宗海.jpg", name: "唐宗海" },
+          { year: "民国", image: "data/第四页/人物/张锡纯.jpg", name: "张锡纯" },
+          { year: "新中国成立后", image: "data/第四页/人物/陈可冀.jpg", name: "陈可冀" },
+          { year: "", image: "data/第四页/人物/吴咸中.jpg", name: "吴咸中" },
+          { year: "", image: "data/第四页/人物/屠呦呦.jpg", name: "屠呦呦" },
+          { year: "", image: "data/第四页/人物/张伯礼.jpg", name: "张伯礼" },
+          { year: "", image: "data/第四页/人物/陆广莘.jpg", name: "陆广莘" }
+        ];
+
+        // 绘制第二个时间轴，靠右，长度为屏幕宽度的 40%
+        const timelineY2 = height * 0.3;
+        const timeAxisEndRight = width - width * 0.03;
+        const timeAxisStartRight = width * 0.55;
+        svg.append("line")
+          .attr("class", "time-axis")
+          .attr("x1", timeAxisStartRight)
+          .attr("y1", timelineY2)
+          .attr("x2", timeAxisEndRight)
+          .attr("y2", timelineY2);
+
+
+        // 绘制第二个时间轴的时间标记、标签和图片
+        timelineData2.forEach((d, i) => {
+          const x = timeAxisStartRight + (width * 0.4 / (timelineData2.length - 1)) * i;
+          // 绘制时间标记（圆形）
+          svg.append("circle")
+            .attr("class", "time-marker")
+            .attr("cx", x)
+            .attr("cy", timelineY2)
+            .attr("r", 4);
+
+
+          // 确定标签位置（上下错落）
+          const labelYOffset = (i % 2 === 0) ? 15 : -15;
+          const labelY = timelineY2 + labelYOffset;
+
+          // 添加时间标签
+          svg.append("text")
+            .attr("class", "time-label")
+            .attr("x", x)
+            .attr("y", labelY + 7.5)
+            .text(d.year);
+
+          if (d.images) {
+            d.images.forEach((imgUrl, imgIndex) => {
+              const yOffset = (imgIndex % 2 === 0) ? -100 : 30;
+              const y = timelineY2 + yOffset;
+
+              // 添加图片容器
+              const imageContainer = d3.select("body")
+                .append("div")
+                .attr("class", "image-container")
+                .style("left", `${x - 40}px`)
+                .style("top", `${y}px`);
+
+              // 添加图片
+              imageContainer.append("img")
+                .attr("src", imgUrl);
+
+              // 添加姓名标签
+              d3.select("body")
+                .append("div")
+                .attr("class", "name-label")
+                .style("left", `${x - 30}px`)
+                .style("top", `${y + 70}px`)
+                .text(d.name);
+            });
+          } else {
+            // 确定图片位置（上下错落）
+            const yOffset = (i % 2 === 0) ? -100 : 30;
+            const y = timelineY2 + yOffset;
+
+            // 添加图片容器
+            const imageContainer = d3.select("body")
+              .append("div")
+              .attr("class", "image-container")
+              .style("left", `${x - 40}px`)
+              .style("top", `${y}px`);
+
+            // 添加图片
+            imageContainer.append("img")
+              .attr("src", d.image)
+              .on("click", function () {
+                currentScientist = medicalScientists.find(scientist => scientist.name === d.name);
+                if (currentScientist && Array.isArray(currentScientist.生平经历)) {
+                  const bioText = currentScientist.生平经历;
+                  textBox1.html(bioText[0]);
+                  textBox2.html(bioText[1]);
+                  textBox3.html(bioText[2]);
+                  textBox4.html(bioText[3]);
+                  currentSection = "生平经历";
+                } else {
+                  console.error("数据结构不符合预期，无法显示生平经历");
+                }
+              });
+
+            // 添加姓名标签
+            d3.select("body")
+              .append("div")
+              .attr("class", "name-label")
+              .style("left", `${x - 30}px`)
+              .style("top", `${y + 70}px`)
+              .text(d.name);
+          }
+        });
+
+        // 添加竖着的文字标签
+        const labelYPositions = [height * 0.5, height * 0.56, height * 0.61, height * 0.66];
+        const labelXPositions = [width * 0.053, width * 0.1, width * 0.152, width * 0.2];
+        const labels = ["生平经历", "历史成就", "传说故事", "后世影响"];
+        labels.forEach((label, index) => {
+          svg.append("text")
+            .attr("class", "vertical-label")
+            .attr("x", labelXPositions[index])
+            .attr("y", labelYPositions[index])
+            .text(label)
+            .on("click", function () {
+              if (currentScientist) {
+                const sectionData = currentScientist[label];
+                if (Array.isArray(sectionData)) {
+                  textBox1.html(sectionData[0]);
+                  textBox2.html(sectionData[1]);
+                  textBox3.html(sectionData[2]);
+                  textBox4.html(sectionData[3]);
+                  currentSection = label; // 更新当前部分
+                } else {
+                  console.error("数据结构不符合预期，无法显示", label);
+                }
+              }
+            });
+        });
+
+        // 添加竖着的文字标签
+        const labelYPositions2 = [height * 0.9, height * 0.84, height * 0.8, height * 0.755];
+        const labelXPositions2 = [width * 0.8, width * 0.85, width * 0.905, width * 0.953];
+        const labels2 = ["生平经历", "理念革新", "临床创举", "国际扬名"];
+        labels2.forEach((label, index) => {
+          svg.append("text")
+            .attr("class", "vertical-label")
+            .attr("x", labelXPositions2[index])
+            .attr("y", labelYPositions2[index])
+            .text(label)
+            .on("click", function () {
+              if (currentScientist) {
+                const sectionData = currentScientist[label];
+                if (Array.isArray(sectionData)) {
+                  textBox1.html(sectionData[0]);
+                  textBox2.html(sectionData[1]);
+                  textBox3.html(sectionData[2]);
+                  textBox4.html(sectionData[3]);
+                  currentSection = label;
+                } else {
+                  console.error("数据结构不符合预期，无法显示", label);
+                }
+              }
+            });
+        });
+
+
+
+        // 绘制横线,左下
+        svg.append("line")
+          .attr("class", "long-line1")
+          .attr("x1", width * 0.1)
+          .attr("y1", height * 0.8)
+          .attr("x2", width * 0.3)
+          .attr("y2", height * 0.8);
+        // svg.append("line")
+        //   .attr("class", "long-line2")
+        //   .attr("x1", width * 0.11)
+        //   .attr("y1", height * 0.798)
+        //   .attr("x2", width * 0.31)
+        //   .attr("y2", height * 0.798);
+
+        // 添加文本框
+        textBox1 = d3.select("body")
+          .append("div")
+          .attr("class", "text-box1")
+          .style("left", `${width * 0.1}px`)
+          .style("top", `${height * 0.8 + 10}px`)
+          .text("扁鹊，原名秦越人，约生于公元前 407 年，卒于公元前 310 年，战国时期渤海郡鄚（今河北任丘）人。他年轻时做过客栈主管，在客栈中结识了长桑君。长桑君认为扁鹊为人正直、善良，且聪慧过人，便将自己的医术和秘方传授给了他。");
+
+
+
+        // 绘制横线，左上
+        svg.append("line")
+          .attr("class", "long-line2")
+          .attr("x1", width * 0.3)
+          .attr("y1", height * 0.45)
+          .attr("x2", width * 0.5)
+          .attr("y2", height * 0.45);
+        // 添加文本框
+        textBox2 = d3.select("body")
+          .append("div")
+          .attr("class", "text-box2")
+          .style("left", `${width * 0.3}px`)
+          .style("top", `${height * 0.45 + 10}px`)
+          .text("扁鹊学成后，开始游历各国行医。他根据各地不同的疾病流行情况和人们的需求，变换着自己的行医科目。例如，在赵国的都城邯郸，当地重视妇女，他就做带下医，即妇科医生；到了周朝的都城洛阳，那里的人尊敬老人，他就当耳目痹医，主要治疗耳聋、眼花、风湿痹痛等老年病；而到了秦国的都城咸阳，秦人喜爱小儿，他就成为儿科医生。");
+
+
+
+        // 绘制横线，右下
+        svg.append("line")
+          .attr("class", "long-line3")
+          .attr("x1", width * 0.45)
+          .attr("y1", height * 0.75)
+          .attr("x2", width * 0.65)
+          .attr("y2", height * 0.75);
+        // 添加文本框
+        textBox3 = d3.select("body")
+          .append("div")
+          .attr("class", "text-box3")
+          .style("left", `${width * 0.45}px`)
+          .style("top", `${height * 0.75 + 10}px`)
+          .text("他行医足迹遍布各地，从今天的河北、河南、山东、山西到陕西等地，都留下了他治病救人的身影。在长期的医疗实践中，扁鹊不断积累经验，提高自己的医术水平，逐渐成为了一名声誉卓著的医生。");
+
+
+        // 绘制横线，右上
+        svg.append("line")
+          .attr("class", "long-line4")
+          .attr("x1", width * 0.7)
+          .attr("y1", height * 0.5)
+          .attr("x2", width * 0.9)
+          .attr("y2", height * 0.5);
+
+        // 添加文本框
+        textBox4 = d3.select("body")
+          .append("div")
+          .attr("class", "text-box4")
+          .style("left", `${width * 0.7}px`)
+          .style("top", `${height * 0.5 + 10}px`)
+          .text("扁鹊的医术高超，声名远扬，这引起了一些人的嫉妒和怨恨。秦国的太医令李醯自知医术不如扁鹊，害怕扁鹊受到秦王的重用而威胁到自己的地位，于是派人在半路上刺杀了扁鹊。一代名医就这样不幸遇害，但是他的医学成就和高尚品德却永远被后人铭记和传颂。他的医学思想和治疗方法对后世医学的发展产生了深远的影响，被历代医家奉为学习的楷模。");
+      })
+      .catch(function (error) {
+        console.error("Error loading JSON file:", error);
+      });
+
+
+
+  </script>
+</body>
+
+</html>

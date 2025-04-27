@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>二十四节气食物与中医穴位可视化</title>
+    <script src="plugins/d3.v7.min.js"></script>
+    <script src="plugins/sankey.js"></script>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        body > svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+            background-image: url('background.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            opacity: 0.9;
+        }
+        .tooltip {
+            position: absolute;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            pointer-events: none;
+            font-size: 14px;
+            max-width: 300px;
+            z-index: 10;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+        }
+        .sankey-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .sankey-title {
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .node rect {
+            shape-rendering: crispEdges;
+            stroke: white;
+            stroke-width: 1px;
+        }
+        .node text {
+            font-size: 12px;
+            fill: black;
+        }
+        .link {
+            fill: none;
+            mix-blend-mode: multiply;
+        }
+        .error-message {
+            color: red;
+            text-align: center;
+            padding: 20px;
+            font-size: 18px;
+        }
+        .season-image {
+    border-radius: 50%;
+}
+
+        .season-image {
+    border-radius: 50%; /* 确保图片在非SVG环境下也能显示为圆形 */
+    pointer-events: none; /* 让点击事件穿透到下面的hitbox */
+}
+.season-image-hitbox {
+    cursor: pointer;
+}
+.sector4{
+    cursor: pointer;
+}
+    </style>
+            <style>
+        #pageSelector{
+            font-size:25px;
+            border-radius: 5px;
+             border: 1px solid #ccc;
+            padding: 8px 15px;
+            font-family: "STXingkai",
+        /* Windows 标准名称 */
+        "华文行楷",
+        /* 中文名称 */
+        "Xingkai SC",
+        /* macOS/iOS 名称 */
+        "STXinwei",
+        /* 备用名称 */
+        "KaiTi",
+        /* 回退到楷体 */
+        cursive;;
+            cursor: pointer;
+            background-color: white;
+        }
+    </style>
+
+</head>
+<body>
+<div class="loading">加载数据中...</div>
+<div class="tooltip" style="opacity: 0;"></div>
+<!-- 导航链接 -->
+<div style="position: absolute; top: 20px; right: 20px; z-index: 1000; padding: 10px;">
+    <label for="pageSelector"></label><select id="pageSelector">
+     <option value="第三页.html">节气养和</option>
+        <option value="第四页.html">杏林春秋</option>
+                <option value="第一页.html">流派渊承</option>
+                <option value="第二页.html">导引千式</option>
+                <option value="首页.html">首页</option>
+    </select>
+</div>
+<script>
+    // 获取下拉框元素
+    const pageSelector = document.getElementById('pageSelector');
+
+    // 添加change事件监听器
+    pageSelector.addEventListener('change', function() {
+        // 获取选中的值
+        const selectedPage = this.value;
+
+        // 如果选择了有效选项，则跳转页面
+        if (selectedPage) {
+            window.location.href = selectedPage;
+        }
+    });
+</script>
+<script>
+    const svg = d3.select("body")
+        .append("svg")
+        .attr("width", "100%")
+        .attr("height", "100%")
+    const tooltip = d3.select(".tooltip");
+
+
+    //添加标题名称
+
+    // 类别名称
+    const categories = ["翠蔬集", "果香苑", "肉脯笺", "茶韵簿", "百味羹"];
+
+    // 24节气颜色映射（按节气名称）
+    const seasonColorMap = {
+        "立春": "#c6b4d8", "雨水": "#c6b4d8", "惊蛰": "#c6b4d8", "春分": "#c6b4d8",
+        "清明": "#c6b4d8", "谷雨": "#c6b4d8", "立夏": "#e36255", "小满": "#e36255",
+        "芒种": "#e36255", "夏至": "#e36255", "小暑": "#e36255", "大暑": "#e36255",
+        "立秋": "#a2c5c9", "处暑": "#a2c5c9", "白露": "#a2c5c9", "秋分": "#a2c5c9",
+        "寒露": "#a2c5c9", "霜降": "#a2c5c9", "立冬": "#b6c796", "小雪": "#b6c796",
+        "大雪": "#b6c796", "冬至": "#b6c796", "小寒": "#b6c796", "大寒": "#b6c796"
+    };
+    // 12地支和对应月份
+    const earthlyBranches = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"];
+    const branchMonths = ["十一月", "十二月", "一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月"];
+
+    // 桑基图数据
+    let sankeyData = null;
+    let sankeyGraph = null;
+
+    // 加载所有数据
+    Promise.all([
+        d3.json("data/第三页/food.json"),
+        d3.json("data/第三页/sankey.json")
+    ]).then(function([foodData, sankeyJson]) {
+        d3.select(".loading").remove();
+
+        // 处理食物数据
+        const seasonOrder = [
+            "立春", "雨水", "惊蛰", "春分", "清明", "谷雨",
+            "立夏", "小满", "芒种", "夏至", "小暑", "大暑",
+            "立秋", "处暑", "白露", "秋分", "寒露", "霜降",
+            "立冬", "小雪", "大雪", "冬至", "小寒", "大寒"
+        ];
+
+        // 按24节气顺序排序数据
+        const sortedData = seasonOrder.map(name =>
+            foodData.seasonsData.find(d => d.name === name)
+        ).filter(d => d);
+
+        // 处理桑基图数据
+        if (!sankeyJson || !Array.isArray(sankeyJson.nodes) || !Array.isArray(sankeyJson.links)) {
+            throw new Error("桑基图数据格式不正确，缺少nodes或links数组");
+        }
+
+        // 处理原始数据
+        sankeyData = {
+            nodes: sankeyJson.nodes.map((d, i) => ({
+                ...d,
+                id: i
+            })),
+            links: sankeyJson.links
+        };
+
+        // 创建节点名称到ID的映射
+        const nodeMap = {};
+        sankeyData.nodes.forEach(d => nodeMap[d.name] = d.id);
+
+        // 处理连接
+        sankeyData.links = sankeyData.links.map(d => {
+            if (!nodeMap.hasOwnProperty(d.source) || !nodeMap.hasOwnProperty(d.target)) {
+                console.warn(`无效的连接: ${d.source} -> ${d.target}`);
+                return null;
+            }
+            return {
+                source: nodeMap[d.source],
+                target: nodeMap[d.target],
+                value: d.value || 1,
+                solar: d.solar || [],
+                effect: sankeyData.nodes[nodeMap[d.source]].effect || "无具体描述"
+            };
+        }).filter(d => d !== null);
+
+        // 初始渲染
+        render(sortedData);
+
+        // 窗口大小改变时重新渲染
+        window.addEventListener("resize", function() {
+            render(sortedData);
+        });
+
+    }).catch(function(error) {
+        d3.select(".loading").text("数据加载失败，请刷新重试");
+        console.error("Error loading the data:", error);
+    });
+
+    // 整合后的渲染函数
+    function render(seasonsData) {
+        const width = svg.node().clientWidth;
+        const height = svg.node().clientHeight;
+        console.log(width, height);
+
+        // 清除之前的内容
+        svg.selectAll("*").remove();
+
+        // ==================== 添加标题 ====================
+    // 大标题：溯古医源·节气养和（左上角）
+    svg.append("text")
+        .attr("x", "5%") // 左侧5%位置
+        .attr("y", "5%") // 顶部8%位置
+        .attr("text-anchor", "left") // 左对齐
+        .attr("font-size", "50px") // 大字号
+        .attr("font-weight", "bold") // 加粗
+        .attr("font-family", "'STXingkai', 'Xingkai SC', 'KaiTi', cursive") // 书法字体
+        .attr("fill", "#c19d3f") // 使用节气颜色
+        .text("溯古医源·节气养和");
+
+    // 三个小标题
+    // 1. 岁时节气（圆弧图上方）
+    svg.append("text")
+        .attr("x", "25%") // 圆弧图中心位置
+        .attr("y", "13%") // 顶部5%位置
+        .attr("text-anchor", "middle") // 居中对齐
+        .attr("font-size", "35px")
+        .attr("font-weight", "bold")
+        .attr("font-family", "'STXingkai', 'Xingkai SC', 'KaiTi', cursive")
+        .attr("fill", "#333333") // 蓝色系
+        .text("岁时节气");
+
+    // 2. 节令食补（矩阵图上方）
+    svg.append("text")
+        .attr("x", "60%") // 矩阵图中心位置
+        .attr("y", "15%") // 顶部5%位置
+        .attr("text-anchor", "middle")
+        .attr("font-size", "35px")
+        .attr("font-weight", "bold")
+        .attr("font-family", "'STXingkai', 'Xingkai SC', 'KaiTi', cursive")
+        .attr("fill", "#333333") // 红色系
+        .text("节令食补");
+
+    // 3. 点按通知（桑基图上方）
+    svg.append("text")
+        .attr("x", "85%") // 桑基图中心位置
+        .attr("y", "20%") // 顶部5%位置
+        .attr("text-anchor", "middle")
+        .attr("font-size", "35px")
+        .attr("font-weight", "bold")
+        .attr("font-family", "'STXingkai', 'Xingkai SC', 'KaiTi', cursive")
+        .attr("fill", "#333333") // 绿色系
+        .text("点按通和");
+
+
+        // ==================== 矩阵部分 ====================
+        // 计算矩阵尺寸和位置
+        const matrixWidth = width * 0.2;
+        const matrixHeight = height * 0.7;
+        const matrixX = width * 0.53;
+        const matrixY = height * 0.2;
+
+        // 确保矩阵不会超出视图右边界
+        const adjustedMatrixX = Math.min(matrixX, width - matrixWidth - 20);
+
+        // 添加矩阵背景
+       /* svg.append("rect")
+            .attr("x", adjustedMatrixX)
+            .attr("y", matrixY)
+            .attr("width", matrixWidth)
+            .attr("height", matrixHeight)
+            .attr("fill", "white")
+            .attr("rx", 10)
+            .attr("ry", 10)
+            .attr("stroke", "#ddd")
+            .attr("stroke-width", 1);*/
+
+        // 计算每个格子的尺寸
+        const cellWidth = matrixWidth / categories.length;
+        const cellHeight = matrixHeight / (seasonsData.length + 1);
+
+
+        // 添加类别标题
+        categories.forEach((category, col) => {
+            svg.append("text")
+                .attr("x", adjustedMatrixX + col * cellWidth + cellWidth / 2)
+                .attr("y", matrixY + cellHeight * 0.7)
+                .attr("text-anchor", "middle")
+                .attr("font-size", "15px")
+                .attr("font-weight", "bold")
+                .attr("fill", "#666")
+                .text(category);
+
+            // 添加类别分隔线
+            if (col > 0) {
+                svg.append("line")
+                    .attr("x1", adjustedMatrixX + col * cellWidth)
+                    .attr("y1", matrixY)
+                    .attr("x2", adjustedMatrixX + col * cellWidth)
+                    .attr("y2", matrixY + matrixHeight)
+                    .attr("stroke", "#eee")
+                    .attr("stroke-width", 1);
+            }
+        });
+
+        // 添加节气分隔线
+        seasonsData.forEach((season, row) => {
+            svg.append("line")
+                .attr("x1", adjustedMatrixX)
+                .attr("y1", matrixY + (row + 1) * cellHeight)
+                .attr("x2", adjustedMatrixX + matrixWidth)
+                .attr("y2", matrixY + (row + 1) * cellHeight)
+                .attr("stroke", "#eee")
+                .attr("stroke-width", 1);
+        });
+
+        // 为每个节气添加圆点
+        seasonsData.forEach((season, row) => {
+            const yPos = matrixY + (row + 1) * cellHeight;
+            const seasonColor = seasonColorMap[season.name];
+
+            // 为每个类别添加圆点
+            season.counts.forEach((count, col) => {
+                const colX = adjustedMatrixX + col * cellWidth;
+
+                // 计算圆点之间的间距
+                const dotRadius = cellHeight * 0.18;
+                const hoverRadius = dotRadius * 1.5;
+                const totalDotsWidth = count * dotRadius * 2;
+                const spacing = (cellWidth - totalDotsWidth) / (count + 1);
+
+                // 添加圆点
+                for (let i = 0; i < count; i++) {
+                    const dotX = colX + spacing * (i + 1) + dotRadius * (2 * i + 1);
+                    const dotY = yPos + cellHeight / 2;
+
+                    const dot = svg.append("circle")
+                        .attr("cx", dotX)
+                        .attr("cy", dotY)
+                        .attr("r", dotRadius)
+                        .attr("data-original-radius", dotRadius) // 添加原始半径记录
+                        .attr("fill", seasonColor)
+                        .attr("stroke", "#fff")
+                        .attr("stroke-width", 1)
+                        .attr("data-row", row)
+                        .attr("data-col", col)
+                        .attr("data-index", i)
+                        .attr("data-id", season.name)
+                        .style("cursor", "pointer")
+                        .style("opacity", 0.6)
+                        .on("mouseover", function(event) {
+                                    if (!d3.select(this).classed("active-dot")) {
+                                      d3.select(this)
+                                 .attr("r", hoverRadius)
+                                .style("opacity", 1);
+        }
+
+                            const rowIdx = +d3.select(this).attr("data-row");
+                            const colIdx = +d3.select(this).attr("data-col");
+                            const itemIdx = +d3.select(this).attr("data-index");
+
+                            const item = seasonsData[rowIdx].items[colIdx][itemIdx];
+                            if (!item) return;
+
+                            let tooltipContent = `<strong>${item.name}</strong><br>节气: ${season.name}<br>功效: ${item.effect}`;
+
+                            if (colIdx === 4 && item.recipe) {
+                                tooltipContent += `<br><br>做法: ${item.recipe}`;
+                            }
+
+                            if (item.img && item.img !== "") {
+                                tooltipContent = `<img src="${item.img}" style="max-width:280px;max-height:150px;display:block;margin-bottom:5px;"><br>` + tooltipContent;
+                            }
+
+                            tooltip.html(tooltipContent)
+                                .style("opacity", 1)
+                                .style("left", (event.pageX + 10) + "px")
+                                .style("top", (event.pageY - tooltip.node().offsetHeight - 10) + "px");
+                        })
+                            .on("mouseout", function() {
+        if (!d3.select(this).classed("active-dot")) {
+            d3.select(this)
+                .attr("r", dotRadius)
+                .style("opacity", 0.6);
+        }
+        tooltip.style("opacity", 0);
+                        });
+                }
+            });
+        });
+
+
+ <!-- ==================== 圆弧部分 ==================== -->
+// 计算圆弧图形的大小和位置const layer5Radius = innerRadius + arcHeight * 0.6; // 第5层半径（最外层）
+const arcHeight =Math.max( height * 0.6,width*0.28); // 圆弧总高度设为画布高度的60%
+const arcY = height * 0.1; // 圆弧顶部距离画布顶部10%高度
+const arcX =width*0.245; // 圆弧中心X坐标，基于矩阵位置计算
+
+// 创建圆弧组容器，设置位置变换
+const arcGroup = svg.append("g")
+    .attr("class", "arc-group") // 添加CSS类名
+    .attr("transform", `translate(${arcX}, ${arcY + arcHeight/1.3})`); // 定位到计算好的位置
+// 定义5层圆弧的半径（从内到外）
+const innerRadius = arcHeight * 0.1; // 最内层半径
+const layer1Radius = innerRadius; // 第1层半径（中心圆）
+const layer2Radius = innerRadius + arcHeight * 0.15; // 第2层半径
+const layer3Radius = innerRadius + arcHeight * 0.3; // 第3层半径
+const layer4Radius = innerRadius + arcHeight * 0.45; // 第4层半径
+const layer5Radius = innerRadius + arcHeight * 0.6; // 第5层半径（最外层）
+
+// 创建12等分的扇形数据（用于12地支和月份）
+const pieData = d3.range(12).map(i => ({
+    index: i, // 分区索引
+    startAngle: i * Math.PI / 6 - Math.PI*0.74, // 起始角度（调整了初始偏移）
+    endAngle: (i + 1) * Math.PI / 6 - Math.PI*0.74 // 结束角度
+}));
+
+// 24节气顺序定义（按中国传统节气顺序）
+const seasonOrder = [
+    "立冬", "小雪", "大雪", "冬至", "小寒", "大寒",
+    "立春", "雨水", "惊蛰", "春分", "清明", "谷雨",
+    "立夏", "小满", "芒种", "夏至", "小暑", "大暑",
+    "立秋", "处暑", "白露", "秋分", "寒露", "霜降"
+];
+   /* const seasonColorMap = {
+        "立春": "#c6b4d8", "雨水": "#c6b4d8", "惊蛰": "#c6b4d8", "春分": "#c6b4d8",
+        "清明": "#c6b4d8", "谷雨": "#c6b4d8", "立夏": "#e36255", "小满": "#e36255",
+        "芒种": "#e36255", "夏至": "#e36255", "小暑": "#e36255", "大暑": "#e36255",
+        "立秋": "#a2c5c9", "处暑": "#a2c5c9", "白露": "#a2c5c9", "秋分": "#a2c5c9",
+        "寒露": "#a2c5c9", "霜降": "#a2c5c9", "立冬": "#b6c796", "小雪": "#b6c796",
+        "大雪": "#b6c796", "冬至": "#b6c796", "小寒": "#b6c796", "大寒": "#b6c796"
+    };*/
+// 节气颜色映射（为每个节气分配特定颜色）
+const seasonColorMap2 = {
+    "立春": "#b6c796", "雨水": "#b6c796", "惊蛰": "#b6c796", "春分": "#b6c796",
+    "清明": "#b6c796", "谷雨": "#b6c796", "立夏": "#c6b4d8", "小满": "#c6b4d8",
+    "芒种": "#c6b4d8", "夏至": "#c6b4d8", "小暑": "#c6b4d8", "大暑": "#c6b4d8",
+    "立秋": "#f1b2b2", "处暑": "#f1b2b2", "白露": "#f1b2b2", "秋分": "#f1b2b2",
+    "寒露": "#f1b2b2", "霜降": "#f1b2b2", "立冬": "#a2c5c9", "小雪": "#a2c5c9",
+    "大雪": "#a2c5c9", "冬至": "#a2c5c9", "小寒": "#a2c5c9", "大寒": "#a2c5c9"
+};
+
+// 创建24等分的扇形数据（用于24节气）
+const pieData24 = d3.range(24).map(i => ({
+    index: i, // 分区索引
+    startAngle: i * Math.PI / 12 - Math.PI*0.74, // 起始角度（比12分区更细）
+    endAngle: (i + 1) * Math.PI / 12 - Math.PI*0.74, // 结束角度
+    name: seasonOrder[i] // 对应的节气名称
+}));
+
+// ============== 第1层圆弧（中心圆） ==============
+// ============== 第1层圆弧（中心圆） ==============
+// 创建径向渐变效果 - 修改为更柔和的渐变
+const centerGradient = svg.append("defs").append("radialGradient")
+    .attr("id", "centerGradient")
+    .attr("cx", "50%")
+    .attr("cy", "50%")
+    .attr("r", "70%");
+
+// 定义渐变颜色 - 使用中国传统色：米色渐变
+centerGradient.append("stop")
+    .attr("offset", "0%")
+    .attr("stop-color", "#F8F4E6"); // 浅米色
+
+centerGradient.append("stop")
+    .attr("offset", "100%")
+    .attr("stop-color", "#E8D8B5"); // 深米色
+
+// 绘制中心圆 - 添加阴影效果
+arcGroup.append("circle")
+    .attr("r", layer1Radius)
+    .attr("fill", "url(#centerGradient)")
+    .attr("stroke", "#C4A662") // 使用金色边框
+    .attr("stroke-width", 1.5)
+    .attr("filter", "url(#dropshadow)"); // 添加阴影
+
+// 添加"二十四节气"标题文字
+arcGroup.append("text")
+    .attr("text-anchor", "middle") // 文字居中
+    .attr("dy", "0.3em") // 垂直微调
+    .attr("font-size", layer1Radius * 0.4) // 字体大小
+    .attr("font-weight", "bold") // 加粗
+    .attr("fill", "#333") // 文字颜色
+    .attr("font-family", "'Microsoft YaHei', sans-serif") // 字体
+    .text("二十四节气"); // 文字内容
+
+// ============== 第2层圆弧（12地支层） ==============
+// 创建扇形生成器
+const arc1 = d3.arc()
+    .innerRadius(layer1Radius)
+    .outerRadius(layer2Radius);
+
+// 定义12地支颜色 - 使用中国传统12色
+const branchColors = [
+    "#d9e7e9", "#d9e7e9", "#d9e7e9", "#e1e8d5",
+    "#e1e8d5", "#e1e8d5", "#e8e1ef", "#e8e1ef",
+    "#e8e1ef", "#ffe5e5", "#ffe5e5", "#ffe5e5"
+];
+
+// 绘制12个扇形区域 - 每个地支使用不同颜色
+arcGroup.selectAll(".sector1")
+    .data(pieData)
+    .enter().append("path")
+    .attr("class", "sector1")
+    .attr("d", arc1)
+    .attr("fill", (d, i) => branchColors[i]) // 使用12色循环
+    .attr("stroke", "#fff") // 白色边框
+    .attr("stroke-width", 1)
+    .attr("opacity", 0.8); // 稍微透明
+// ============== 第3层圆弧（月份层） ==============
+// 创建扇形生成器
+const arc2 = d3.arc()
+    .innerRadius(layer2Radius)
+    .outerRadius(layer3Radius);
+
+// 定义月份颜色 - 使用季节渐变色
+const monthColors = [
+    "#bdd6d9", "#bdd6d9", "#bdd6d9", // 冬季: 深红色系
+    "#cbd7b5", "#cbd7b5", "#cbd7b5", // 春季: 绿色系
+    "#d7cae3", "#d7cae3", "#d7cae3", // 夏季: 蓝色系
+    "#ffcbcb", "#ffcbcb", "#ffcbcb"  // 秋季: 金色系
+];
+
+// 绘制12个扇形区域 - 按季节渐变
+arcGroup.selectAll(".sector2")
+    .data(pieData)
+    .enter().append("path")
+    .attr("class", "sector2")
+    .attr("d", arc2)
+    .attr("fill", (d, i) => monthColors[i]) // 使用季节色
+    .attr("stroke", "#fff") // 白色边框
+    .attr("stroke-width", 1)
+    .attr("opacity", 0.7); // 稍微透明
+
+// 添加阴影滤镜（在defs中添加）
+svg.append("defs").append("filter")
+    .attr("id", "dropshadow")
+    .append("feDropShadow")
+    .attr("dx", 1)
+    .attr("dy", 1)
+    .attr("stdDeviation", 2)
+    .attr("flood-color", "rgba(0,0,0,0.3)");
+// ============== 第4层圆弧（24节气层） ==============
+// 创建扇形生成器（第3层到第4层之间）
+const arc3 = d3.arc()
+    .innerRadius(layer3Radius) // 内半径
+    .outerRadius(layer4Radius); // 外半径
+
+// 绘制24个扇形区域（每个节气使用不同颜色）
+arcGroup.selectAll(".sector3")
+    .data(pieData24) // 绑定24分区数据
+    .attr("data-id", d => d.name) // 添加节气标识
+    .enter().append("path")
+    .attr("class", "sector3") // CSS类名
+    .attr("d", arc3) // 使用扇形生成器
+    .attr("fill", d => seasonColorMap2[d.name]) // 根据节气名称获取颜色
+    .attr("stroke", "#fff") // 白色边框
+    .attr("stroke-width", 1.2) // 边框宽度
+    .style("opacity", 0.85) // 透明度
+    // ============== 交互效果 ==============
+    .on("mouseover", function(event, d) {
+        // 1. 鼠标悬停时放大效果
+        const arc3Hover = d3.arc()
+            .innerRadius(layer3Radius * 1.05) // 内径略微缩小
+            .outerRadius(layer4Radius * 1.08); // 外径放大20%
+        // 应用放大效果
+        d3.select(this)
+            .attr("d", arc3Hover) // 更新形状
+            .style("opacity", 1) // 完全不透明
+            .attr("stroke-width", 2); // 加粗边框
+
+
+    })
+    .on("mouseout", function() {
+        // 恢复原始状态
+        d3.select(this)
+            .attr("d", arc3) // 恢复原始形状
+            .style("opacity", 0.85) // 恢复透明度
+            .attr("stroke-width", 1.2); // 恢复边框宽度
+
+        // 移除高亮环
+        arcGroup.selectAll(".highlight-ring").remove();
+
+        // 隐藏提示
+        tooltip.style("opacity", 0);
+    })
+    // 点击交互
+    .on("click", function(event, d) {
+    event.stopPropagation();
+
+    // 获取当前点击的节气名称
+    let clickedSeason = d.name;
+    const currentIndex = seasonOrder.indexOf(clickedSeason);
+    if (currentIndex >= 0) {
+        const correctedIndex = (currentIndex - 6 + 24) % 24;
+        clickedSeason = seasonOrder[correctedIndex];
+    }
+
+    // 检查是否已经点击了当前扇形（新增状态变量）
+    const wasActive = d3.select(this).classed("clicked");
+
+    // 重置所有点击状态
+    arcGroup.selectAll(".sector3.clicked")
+        .classed("clicked", false)
+        .transition()
+        .duration(300)
+        .attr("d", arc3)
+        .style("opacity", 0.85)
+        .attr("stroke", "#fff")
+        .attr("stroke-width", 1.2);
+
+    // 移除所有高亮环
+    arcGroup.selectAll(".highlight-ring").remove();
+
+    // 如果点击的是已激活的扇形，则重置所有元素后返回
+    if (wasActive) {
+        restoreAllSankeyElements();
+        resetHighlights();
+        return;
+    }
+
+    // 设置当前点击状态
+    d3.select(this)
+        .classed("clicked", true)
+        .transition()
+        .duration(300)
+        .attr("d", d3.arc()
+            .innerRadius(layer3Radius * 1.1)
+            .outerRadius(layer4Radius * 1.3)
+        )
+        .style("opacity", 1)
+        .attr("stroke", "gold")
+        .attr("stroke-width", 3);
+
+    // 高亮相关元素
+    highlightSeason(clickedSeason);
+    highlightSankeyBySeason(clickedSeason);
+});
+
+// ============== 高亮相关函数 ==============
+function highlightSankeyBySeason(seasonName) {
+    // 首先降低所有元素的透明度
+    d3.selectAll(".link")
+        .attr("stroke-opacity", 0.1)
+        .attr("stroke-width", d => Math.max(0.5, d.width));
+
+  d3.selectAll(".node rect")
+        .attr("fill-opacity", 0.1)
+        .attr("stroke", "none");
+
+    // 高亮与节气相关的节点
+    sankeyGraph.nodes.forEach(node => {
+        if (node.solar && node.solar.includes(seasonName)) {
+            d3.selectAll(`.node-${node.index}`).select("rect")
+                .attr("fill-opacity", 1)
+                .attr("stroke", "gold")
+                .attr("stroke-width", 3);
+        }
+    });
+
+    // 高亮与节气相关的连线
+    sankeyGraph.links.forEach(link => {
+        const sourceNode = sankeyGraph.nodes[link.source.index];
+        const targetNode = sankeyGraph.nodes[link.target.index];
+
+        if ((sourceNode.solar && sourceNode.solar.includes(seasonName)) ||
+            (targetNode.solar && targetNode.solar.includes(seasonName))) {
+            d3.selectAll(".link")
+                .filter(l => l === link)
+                .attr("stroke-opacity", 1)
+                .attr("stroke-width", Math.max(4, link.width))
+                .attr("stroke", seasonColorMap[seasonName]);
+        }
+    });
+}
+
+// 修改后的恢复函数
+function restoreAllSankeyElements() {
+    d3.selectAll(".link")
+        .attr("stroke-opacity", 0.3)  // 恢复默认透明度
+        .attr("stroke-width", d => Math.max(1, d.width))
+        .attr("stroke", d => {  // 恢复原始颜色
+            const sourceNode = sankeyGraph.nodes[d.source.index];
+            if (sourceNode.solar && sourceNode.solar.length > 0) {
+                return seasonColorMap[sourceNode.solar[0]] || "#999";
+            }
+            return "#999";
+        });
+
+    d3.selectAll(".node rect")
+        .attr("fill-opacity", 0.7)  // 恢复默认透明度
+        .attr("stroke", "none")
+        .attr("fill", d => {  // 恢复原始颜色
+            if (d.solar && d.solar.length > 0) {
+                return seasonColorMap[d.solar[0]] || "#999";
+            }
+            return "#999";
+        });
+}
+
+function highlightSeason(seasonName) {
+    resetHighlights();
+
+    // 高亮矩阵中的圆点
+    svg.selectAll("circle[data-id='" + seasonName + "']")
+        .classed("active-dot", true)
+        .attr("data-original-radius", function() {
+            return d3.select(this).attr("r");
+        })
+        .attr("r", function() {
+            return parseFloat(d3.select(this).attr("r")) * 1.5;
+        })
+        .style("opacity", 1)
+        .style("stroke", "gold")
+        .style("stroke-width", 2);
+}
+
+function resetHighlights() {
+    // 重置矩阵圆点
+    svg.selectAll(".active-dot")
+        .classed("active-dot", false)
+        .attr("r", function() {
+            return d3.select(this).attr("data-original-radius") ||
+                   parseFloat(d3.select(this).attr("r")) / 1.5;
+        })
+        .style("opacity", 0.6)
+        .style("stroke", "#fff")
+        .style("stroke-width", 1);
+}
+
+// ============== 第5层圆弧（外装饰层） ==============
+// 创建扇形生成器（第4层到第5层之间）
+/*const arc4 = d3.arc()
+    .innerRadius(layer4Radius) // 内半径
+    .outerRadius(layer5Radius); // 外半径
+
+// 绘制24个扇形区域（使用单一颜色）
+arcGroup.selectAll(".sector4")
+    .data(pieData24) // 绑定24分区数据
+    .enter().append("path")
+    .attr("class", "sector4") // CSS类名
+    .attr("d", arc4) // 使用扇形生成器
+    .attr("fill", "#f0f0f0") // 单一浅灰色填充
+    .attr("stroke", "#999") // 边框颜色
+    .attr("stroke-width", 1.2) // 边框宽度
+    .attr("opacity", 0.8) // 透明度*/
+
+
+
+
+// ============== 添加节气图片 ==============
+// ============== 添加节气图片（修改后） ==============
+// 1. 首先创建用于裁剪的圆形clipPath
+svg.append("defs").selectAll("clipPath")
+    .data(pieData24)
+    .enter().append("clipPath")
+    .attr("id", d => `clip-${d.name}`)
+    .append("circle")
+    .attr("r", layer5Radius * 0.11) // 裁剪圆形的半径（比图片小）
+    .attr("cx", 0)
+    .attr("cy", 0);
+
+// 2. 在24节气扇形上添加对应的节气图片
+arcGroup.selectAll(".season-image-container")
+    .data(pieData24)
+    .enter().append("g")
+    .attr("class", "season-image-container")
+    .attr("transform", d => {
+        const midAngle = (d.startAngle + d.endAngle) / 2;
+        const x = Math.cos(midAngle) * (layer4Radius + layer5Radius) / 2;
+        const y = Math.sin(midAngle) * (layer4Radius + layer5Radius) / 2;
+        return `translate(${x}, ${y})`;
+    })
+    .append("image")
+    .attr("class", "season-image")
+    .attr("xlink:href", d => `solar/${d.name}.png`)
+    .attr("width", layer5Radius * 0.3) // 图片比裁剪区域大25%
+    .attr("height", layer5Radius * 0.3)
+    .attr("x", -layer5Radius * 0.125) // 居中定位
+    .attr("y", -layer5Radius * 0.125)
+    .attr("clip-path", d => `url(#clip-${d.name})`) // 应用圆形裁剪
+    .attr("opacity", 0.9);
+
+// 3. 添加隐形圆形方框（用于交互）
+arcGroup.selectAll(".season-image-hitbox")
+    .data(pieData24)
+    .enter().append("circle")
+    .attr("class", "season-image-hitbox")
+    .attr("transform", d => {
+        const midAngle = (d.startAngle + d.endAngle) / 2;
+        const x = Math.cos(midAngle) * (layer4Radius + layer5Radius) / 2;
+        const y = Math.sin(midAngle) * (layer4Radius + layer5Radius) / 2;
+        return `translate(${x}, ${y})`;
+    })
+    .attr("r", layer5Radius * 0.12) // 比裁剪区域稍大一点的隐形区域
+    .attr("fill", "transparent")
+    .attr("stroke", "none")
+    .on("mouseover", function(event, d) {
+        // 这里可以添加交互效果
+        d3.select(this).attr("r", layer5Radius * 0.15);
+    })
+    .on("mouseout", function() {
+        d3.select(this).attr("r", layer5Radius * 0.12);
+    });
+
+
+// ============== 添加文字标签 ==============
+// 添加12地支文字（第1层到第2层之间）
+arcGroup.selectAll(".branch-text")
+    .data(pieData) // 绑定12分区数据
+    .enter().append("text")
+    .attr("class", "branch-text") // CSS类名
+    .attr("transform", d => {
+        // 计算文字位置（扇形中点）
+        const midAngle = (d.startAngle + d.endAngle) / 2;
+        const x = Math.cos(midAngle) * (layer1Radius + layer2Radius) / 2;
+        const y = Math.sin(midAngle) * (layer1Radius + layer2Radius) / 2;
+        return `translate(${x}, ${y})`; // 应用变换
+    })
+    .attr("text-anchor", "middle") // 文字居中
+    .attr("dy", "0.3em") // 垂直微调
+    .attr("font-size", layer1Radius * 0.35) // 字体大小
+    .attr("font-weight", "bold") // 加粗
+    .attr("font-family", "'Microsoft YaHei', sans-serif") // 字体
+    .attr("fill", "#333") // 文字颜色
+    .text(d => earthlyBranches[d.index]); // 显示地支文字
+
+// 添加月份文字（第2层到第3层之间）
+arcGroup.selectAll(".month-text")
+    .data(pieData) // 绑定12分区数据
+    .enter().append("text")
+    .attr("class", "month-text") // CSS类名
+    .attr("transform", d => {
+        // 计算文字位置（扇形中点）
+        const midAngle = (d.startAngle + d.endAngle) / 2;
+        const x = Math.cos(midAngle) * (layer2Radius + layer3Radius) / 2;
+        const y = Math.sin(midAngle) * (layer2Radius + layer3Radius) / 2;
+        return `translate(${x}, ${y})`; // 应用变换
+    })
+    .attr("text-anchor", "middle") // 文字居中
+    .attr("dy", "0.3em") // 垂直微调
+    .attr("font-size", layer1Radius * 0.3) // 字体大小
+    .attr("font-family", "'Microsoft YaHei', sans-serif") // 字体
+    .attr("fill", "#555") // 文字颜色
+    .text(d => branchMonths[d.index]); // 显示月份文字
+
+// 添加24节气文字（第3层到第4层之间）
+arcGroup.selectAll(".season-text")
+    .data(pieData24) // 绑定24分区数据
+    .enter().append("text")
+    .attr("class", "season-text") // CSS类名
+    .attr("transform", d => {
+        // 计算文字位置（扇形中点）
+        const midAngle = (d.startAngle + d.endAngle) / 2;
+        const x = Math.cos(midAngle) * (layer3Radius + layer4Radius) / 2;
+        const y = Math.sin(midAngle) * (layer3Radius + layer4Radius) / 2;
+        return `translate(${x}, ${y})`; // 应用变换
+    })
+    .attr("text-anchor", "middle") // 文字居中
+    .attr("dy", "0.3em") // 垂直微调
+    .attr("font-size", layer1Radius * 0.25) // 字体大小
+    .attr("font-weight", "bold") // 加粗
+    .attr("font-family", "'Microsoft YaHei', sans-serif") // 字体
+    .attr("fill", "white") // 白色文字
+    .attr("text-shadow", "1px 1px 2px rgba(0,0,0,0.5)") // 文字阴影
+    .text(d => d.name); // 显示节气名称
+
+// ============== 最外层装饰环 ==============
+// 添加装饰性外环（虚线效果）
+/*arcGroup.append("circle")
+    .attr("r", layer5Radius + 5) // 半径比第5层稍大
+    .attr("fill", "none") // 无填充
+    .attr("stroke", "#999") // 边框颜色
+    .attr("stroke-width", 3) // 边框宽度
+    .attr("stroke-dasharray", "5,5") // 虚线样式
+    .attr("opacity", 0.6); // 透明度*/
+
+// ==================== 桑基图部分 ====================
+
+// 计算桑基图尺寸和位置 - 左边界距离屏幕右边5%
+const sankeyWidth = width * 0.2; // 保持原宽度不变
+const sankeyHeight = height * 0.77; // 保持原高度不变
+const sankeyX = width * 0.95 - sankeyWidth; // 左边界距离右边5%
+const sankeyY = height * 0.2; // 保持原垂直位置不变
+
+// 创建桑基图容器组
+const sankeyGroup = svg.append("g")
+    .attr("class", "sankey-container")
+    .attr("transform", `translate(${sankeyX}, ${sankeyY})`);
+
+// 创建桑基图内部组
+const sankeyInner = sankeyGroup.append("g")
+    .attr("transform", `translate(10, 40)`);
+
+// 设置桑基图布局
+const sankey = d3.sankey()
+    .nodeWidth(10)
+    .nodePadding(10)
+    .extent([[1, 1], [sankeyWidth - 20, sankeyHeight - 50]]);
+
+// 应用布局
+sankeyGraph = sankey({
+    nodes: JSON.parse(JSON.stringify(sankeyData.nodes)),
+    links: JSON.parse(JSON.stringify(sankeyData.links))
+});
+
+// 全局变量记录当前高亮节点
+let highlightedNode = null;
+
+// 创建连线组
+const link = sankeyInner.append("g")
+    .attr("class", "links")
+    .selectAll(".link")
+    .data(sankeyGraph.links)
+    .enter().append("path")
+    .attr("class", "link")
+    .attr("d", d3.sankeyLinkHorizontal())
+    .attr("stroke", d => {
+        // 使用源节点的第一个节气决定颜色
+        const sourceNode = sankeyGraph.nodes[d.source.index];
+        if (sourceNode.solar && sourceNode.solar.length > 0) {
+            return seasonColorMap[sourceNode.solar[0]] || "#999";
+        }
+        return "#999";
+    })
+    .attr("stroke-width", 20)
+    .attr("stroke-opacity", 1)
+    .style("fill", "none")
+    .style("opacity",1)
+    .style("mix-blend-mode", "multiply")
+    .each(function() {
+        const pathLength = this.getTotalLength();
+        d3.select(this)
+            .attr("stroke-dasharray", pathLength)
+            .attr("stroke-dashoffset", pathLength);
+    })
+    .on("mouseover", function(event, d) {
+        // 无论是否高亮状态，都显示工具提示
+        tooltip.transition()
+            .duration(200)
+            .style("opacity", 1);
+
+        tooltip.html(
+            `<strong>${sankeyGraph.nodes[d.source.index].name}</strong> → <strong>${sankeyGraph.nodes[d.target.index].name}</strong><br/>
+            节气: ${d.solar.join(", ") || "无"}<br/>
+            功效: ${d.effect}`)
+            .style("left", (event.pageX - tooltip.node().offsetWidth - 10) + "px")
+            .style("top", (event.pageY - tooltip.node().offsetHeight - 10) + "px");
+
+        // 如果不是高亮状态，才执行高亮悬停效果
+        if (highlightedNode === null) {
+            d3.select(this)
+                .attr("stroke-opacity", 1)
+                .attr("stroke-width", 4);
+        }
+    })
+    .on("mouseout", function(d) {
+        // 无论是否高亮状态，都隐藏工具提示
+        tooltip.transition()
+            .duration(200)
+            .style("opacity", 0);
+
+        // 如果不是高亮状态，才恢复悬停效果
+        if (highlightedNode === null) {
+            d3.select(this)
+                .attr("stroke-opacity", 0.3)
+                .attr("stroke-width", 3);
+        }
+    });
+
+// 创建节点组
+const node = sankeyInner.append("g")
+    .attr("class", "nodes")
+    .selectAll(".node")
+    .data(sankeyGraph.nodes)
+    .enter().append("g")
+    .attr("class", d => `node node-${d.index}`)
+    .attr("transform", d => `translate(${d.x0},${d.y0})`);
+
+// 添加节点矩形
+node.append("rect")
+    .attr("height", 0)
+    .attr("y", d => (d.y1 - d.y0) / 2)
+    .attr("width", sankey.nodeWidth())
+    .attr("fill", d => {
+        // 使用节点的第一个节气决定颜色
+        if (d.solar && d.solar.length > 0) {
+            return seasonColorMap[d.solar[0]] || "#999";
+        }
+        return "#999";
+    })
+    .attr("rx", 3)
+    .attr("ry", 3)
+    .attr("fill-opacity", 0.7)
+    .attr("data-original-fill", d => {
+        if (d.solar && d.solar.length > 0) {
+            return seasonColorMap[d.solar[0]] || "#999";
+        }
+        return "#999";
+    })
+    .attr("data-id", d => d.solar?.join(",") || "")
+    .on("click", function(event, d) {
+        event.stopPropagation();
+
+        // 如果点击的是已经高亮的节点，则恢复所有元素
+        if (highlightedNode === d.index) {
+            restoreAllElements();
+            highlightedNode = null;
+            return;
+        }
+
+        // 更新高亮节点
+        highlightedNode = d.index;
+
+        // 首先隐藏所有元素
+        d3.selectAll(".link")
+            .attr("stroke-opacity", 0.05)
+            .attr("stroke-width", 2);
+
+        d3.selectAll(".node rect")
+            .attr("fill-opacity", 0.1)
+            .attr("stroke", "none");
+
+        // 高亮当前节点
+        d3.select(this)
+            .attr("fill-opacity", 1)
+            .attr("stroke", "black")
+            .attr("stroke-width", 4);
+
+        // 高亮所有相连的连线
+        sankeyGraph.links.forEach(link => {
+            if (link.source.index === d.index || link.target.index === d.index) {
+                d3.selectAll(".link")
+                    .filter(l => l === link)
+                    .attr("stroke-opacity", 1)
+                    .attr("stroke-width", Math.max(3, link.width));
+            }
+        });
+
+        // 高亮所有相连的节点
+        sankeyGraph.links.forEach(link => {
+            if (link.source.index === d.index) {
+                d3.selectAll(`.node-${link.target.index}`).select("rect")
+                    .attr("fill-opacity", 1)
+                    .attr("stroke", "black")
+                    .attr("stroke-width", 2);
+            }
+            if (link.target.index === d.index) {
+                d3.selectAll(`.node-${link.source.index}`).select("rect")
+                    .attr("fill-opacity", 1)
+                    .attr("stroke", "black")
+                    .attr("stroke-width", 2);
+            }
+        });
+    })
+    .on("mouseover", function(event, d) {
+        // 无论是否高亮状态，都显示工具提示
+        let tooltipContent = `<strong>${d.name}</strong><br/>`;
+        tooltipContent += `节气: ${d.solar?.join(", ") || "无"}<br/>`;
+        tooltipContent += `功效: ${d.effect || "无具体描述"}`;
+
+        if (d.image) {
+            tooltipContent += `<div style="margin-top:10px;"><img src="${d.image}" style="max-width:200px; max-height:150px;"/></div>`;
+        }
+
+        tooltip.transition()
+            .duration(200)
+            .style("opacity", 1);
+
+        tooltip.html(tooltipContent)
+            .style("left", (event.pageX - tooltip.node().offsetWidth - 10) + "px")
+            .style("top", (event.pageY - tooltip.node().offsetHeight - 10) + "px");
+
+        // 如果不是高亮状态，才执行高亮悬停效果
+        if (highlightedNode === null) {
+            d3.select(this)
+                .attr("fill-opacity", 1)
+                .attr("stroke", "black")
+                .attr("stroke-width", 4);
+
+            sankeyGraph.links.forEach(link => {
+                if (link.source.index === d.index || link.target.index === d.index) {
+                    d3.selectAll(".link")
+                        .filter(l => l === link)
+                        .attr("stroke-opacity", 1)
+                        .attr("stroke-width", Math.max(3, link.width));
+                }
+            });
+
+            sankeyGraph.links.forEach(link => {
+                if (link.source.index === d.index) {
+                    d3.selectAll(`.node-${link.target.index}`).select("rect")
+                        .attr("fill-opacity", 1)
+                        .attr("stroke", "black")
+                        .attr("stroke-width", 2);
+                }
+                if (link.target.index === d.index) {
+                    d3.selectAll(`.node-${link.source.index}`).select("rect")
+                        .attr("fill-opacity", 1)
+                        .attr("stroke", "black")
+                        .attr("stroke-width", 2);
+                }
+            });
+        }
+    })
+    .on("mouseout", function(d) {
+        // 无论是否高亮状态，都隐藏工具提示
+        tooltip.transition()
+            .duration(200)
+            .style("opacity", 0);
+
+        // 如果不是高亮状态，才恢复悬停效果
+        if (highlightedNode === null) {
+            d3.select(this)
+                .attr("fill-opacity", 0.7)
+                .attr("stroke", "none");
+
+            d3.selectAll(".link")
+                .attr("stroke-opacity", 0.3)
+                .attr("stroke-width", d => Math.max(1, d.width));
+
+            d3.selectAll(".node rect")
+                .attr("fill-opacity", 0.7)
+                .attr("stroke", "none");
+        }
+    });
+
+// 添加文本标签
+const labels = node.append("text")
+    .attr("y", d => (d.y1 - d.y0) / 2)
+    .attr("dy", ".35em")
+    .text(d => d.name)
+    .style("opacity", 0)
+    .each(function(d) {
+        const text = d3.select(this);
+        if (d.x0 < sankeyWidth / 2) {
+            text.attr("x", 6 + sankey.nodeWidth())
+                .attr("text-anchor", "start");
+        } else {
+            text.attr("x", -6)
+                .attr("text-anchor", "end");
+        }
+    });
+
+// 动画执行顺序
+node.select("rect")
+    .transition()
+    .duration(800)
+    .attr("height", d => d.y1 - d.y0)
+    .attr("y", 0)
+    .attr("fill-opacity", 0.7)
+    .on("end", function() {
+        link.transition()
+            .delay((d, i) => i * 50)
+            .duration(400)
+            .attr("stroke-width",3.5 )
+            .attr("stroke-opacity", 0.3)
+            .attr("stroke-dashoffset", 0)
+            .on("end", function() {
+                labels.transition()
+                    .duration(1200)
+                    .style("opacity", 1);
+            });
+    });
+
+// 恢复所有元素的函数
+function restoreAllElements() {
+    d3.selectAll(".link")
+        .attr("stroke-opacity", 0.3)
+        .attr("stroke-width", d => Math.max(1, d.width));
+
+    d3.selectAll(".node rect")
+        .attr("fill-opacity", 0.7)
+        .attr("stroke", "none");
+}
+
+// 点击SVG空白处恢复所有元素
+svg.on("click", function() {
+    if (highlightedNode !== null) {
+        restoreAllElements();
+        highlightedNode = null;
+    }
+});
+    }
+</script>
+</body>
+</html>
