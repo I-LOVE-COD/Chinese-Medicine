@@ -177,8 +177,8 @@
 
     // 加载所有数据
     Promise.all([
-        d3.json("data/第三页/food.json"),
-        d3.json("data/第三页/sankey.json")
+        d3.json("/Chinese-Medicine/data/第三页/food.json"),
+        d3.json("/Chinese-Medicine/data/第三页/sankey.json")
     ]).then(function([foodData, sankeyJson]) {
         d3.select(".loading").remove();
 
